@@ -88,7 +88,7 @@ class HTMLParser(LXMLParser):
   if tag in self._block:
    self.add = "\n\n"
   elif tag == 'br':
-   self.add = '\n'
+   self.write_data('\n')
   elif tag in self._heading_tags:
    self.add = '\n\n'
    if self.node_parsed_callback:
