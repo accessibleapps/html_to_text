@@ -55,10 +55,11 @@ class HTMLParser(LXMLParser):
  def handle_starttag(self, tag, attrs):
   if self.ignoring:
    return
-  if tag in self._block:
-   self.add = "\n\n"
-  elif tag in self._ignored or attrs.get('class', None) == 'pagenum':
+  if tag in self._ignored or attrs.get('class', None) == 'pagenum':
    self.ignoring = True
+   return
+  elif tag in self._block:
+   self.add = "\n\n"
   elif tag in self._heading_tags:
    self.add = '\n\n'
    level = self.heading_levels[tag]
