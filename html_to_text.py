@@ -62,6 +62,7 @@ class HTMLParser(LXMLParser):
    self.add = "\n\n"
   elif tag in self._heading_tags:
    self.add = '\n\n'
+   self.final_space = False
    level = self.heading_levels[tag]
    start = self.output.tell()+self.startpos+(len(self.add) if not self.starting else 0)+(1 if self.final_space else 0)
    if self.node_parsed_callback:
