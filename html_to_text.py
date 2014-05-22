@@ -16,7 +16,7 @@ class LXMLParser(object):
   self.parse_tag(item)
 
  def parse_tag(self, item):
-  if item.tag != lxml.etree.Comment:
+  if item.tag != lxml.etree.Comment and item.tag != lxml.etree.PI:
    self.handle_starttag(item.tag, item.attrib)
    if item.text is not None:
     self.handle_data(item.text, item.tag)
