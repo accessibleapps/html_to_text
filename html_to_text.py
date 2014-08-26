@@ -72,6 +72,8 @@ class HTMLParser(LXMLParser):
    self.in_pre = True
   if tag == 'a' and 'href' in attrs:
    self.link_start = self.output.tell()+self.startpos+(len(self.add) if not self.starting else 0)+(1 if self.final_space else 0)
+  if tag in ('dd', 'dt'):
+   self.add = '\n'
   if 'id' in attrs and self.node_parsed_callback:
    self.node_parsed_callback(None, 'id', self.file+"#"+attrs['id'], start=self.output.tell()+self.startpos+len(self.add))
 
