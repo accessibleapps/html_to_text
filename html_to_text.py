@@ -29,6 +29,7 @@ class LXMLParser(object):
 class HTMLParser(LXMLParser):
  _heading_tags = "h1 h2 h3 h4 h5 h6".split(' ')
  _pre_tags = ('pre', 'code')
+ _table_tags = ('table', 'tr', 'td', 'th', 'thead', 'tbody', 'tfoot')
  _ignored = ['script', 'style', 'title']
  whitespace_re = re.compile(r'\s+')
  _block = ('p', 'div', 'center', 'blockquote')
@@ -50,6 +51,7 @@ class HTMLParser(LXMLParser):
   self.final_space = False
   self.heading_stack = []
   self.last_page = None
+  self.table_stack = []
   LXMLParser.__init__(self, item)
 
  def handle_starttag(self, tag, attrs):
@@ -76,6 +78,13 @@ class HTMLParser(LXMLParser):
    self.add = '\n'
   if 'id' in attrs and self.node_parsed_callback:
    self.node_parsed_callback(None, 'id', self.file+"#"+attrs['id'], start=self.output.tell()+self.startpos+len(self.add))
+  if tag in self._table_tags and self.node_parsed_callback:
+   if self.table_stack:
+    parent = self.table_stack[-1]['id']
+   else:
+    parent = None
+   node = self.node_parsed_callback(parent, tag, None, start=self.output.tell()+self.startpos+len(self.add), attrs=attrs)
+   self.table_stack.append(node)
 
  def handle_endtag(self, tag, item):
   if 'class' in item.attrib and item.attrib['class'] == 'pagenum':
@@ -103,6 +112,9 @@ class HTMLParser(LXMLParser):
    self.add_link(item)
   elif tag == 'hr':
    self.output.write(HR_TEXT)
+  elif tag in self._table_tags and self.node_parsed_callback:
+   self.table_stack[-1]['end'] = self.output.tell() + self.startpos
+   self.table_stack.pop()
   self.last_start = tag
 
  def handle_data(self, data, start_tag):
