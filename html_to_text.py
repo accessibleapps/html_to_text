@@ -83,7 +83,7 @@ class HTMLParser(LXMLParser):
     parent = self.table_stack[-1]['id']
    else:
     parent = None
-   node = self.node_parsed_callback(parent, tag, None, start=self.output.tell()+self.startpos+len(self.add), attrs=attrs)
+   node = self.node_parsed_callback(parent, tag, None, start=self.output.tell()+self.startpos+len(self.add), attrs=dict(attrs))
    self.table_stack.append(node)
 
  def handle_endtag(self, tag, item):
