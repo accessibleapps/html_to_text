@@ -62,6 +62,7 @@ class HTMLParser(LXMLParser):
    return
   elif tag in self._block:
    self.add = "\n\n"
+   self.final_space = False
   elif tag in self._heading_tags:
    self.add = '\n\n'
    self.final_space = False
