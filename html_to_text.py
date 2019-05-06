@@ -1,4 +1,4 @@
-from StringIO import StringIO
+from io import StringIO
 from logging import getLogger
 logger = getLogger('html_to_text')
 
