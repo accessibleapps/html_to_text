@@ -5,7 +5,10 @@ logger = getLogger('html_to_text')
 import lxml
 import lxml.etree
 import lxml.html
-import urllib
+try:
+ from urllib import unquote
+except ImportError:
+ from urllib.parse import unquote
 import posixpath
 import re
 _collect_string_content = lxml.etree.XPath("string()")
@@ -187,12 +190,12 @@ class HTMLParser(LXMLParser):
   #Is this an internal link?
   href = item.attrib['href']
   if '://' not in href:
-   href = urllib.unquote(item.attrib['href'])
+   href = unquote(item.attrib['href'])
    href = posixpath.normpath(posixpath.join(posixpath.dirname(self.file), href))
   self.node_parsed_callback(None, 'link', text, start=self.link_start, end=self.output.tell()+self.startpos, href=href)
 
 def html_to_text(item, node_parsed_callback=None, startpos=0, file=""):
- if isinstance(item, basestring):
+ if isinstance(item, str):
   item = tree_from_string(item)
  lxml.html.xhtml_to_html(item)
  parser = HTMLParser(item, node_parsed_callback, startpos, file)
