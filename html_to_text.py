@@ -15,6 +15,7 @@ import lxml
 import lxml.etree
 import lxml.html
 from lxml.etree import _Attrib, _Element
+from transitions import Machine
 
 logger = getLogger("html_to_text")
 
@@ -89,11 +90,9 @@ class HTMLParser(LXMLParser):
         self.output = StringIO()
         self.add = ""
         self.initial_space = False
-        self.ignoring = False
-        self.in_pre = False
+        self.in_pre = False  # Track if we're in pre tag for restoration after ignoring
         self.last_data = ""
         self.out: list[str] = [""]
-        self.starting = True  # Haven't written anything yet
         self.final_space = False
         self.heading_stack: list[tuple[int, int, Union[str, int, None]]] = []
         self.last_page: Optional[dict[str, Union[str, int]]] = None
@@ -101,58 +100,112 @@ class HTMLParser(LXMLParser):
         self.last_newline = False
         self.last_start = ""
         self.link_start = 0
+
+        # Set up state machine
+        states = [state.value for state in ContentState]
+        transitions = [
+            # Transitions for marking start of writing (any STARTING -> WRITING)
+            {'trigger': 'mark_writing', 'source': 'starting_normal', 'dest': 'writing_normal'},
+            {'trigger': 'mark_writing', 'source': 'starting_pre', 'dest': 'writing_pre'},
+            {'trigger': 'mark_writing', 'source': 'starting_ignoring', 'dest': 'writing_ignoring'},
+
+            # Transitions for entering pre mode
+            {'trigger': 'enter_pre', 'source': 'starting_normal', 'dest': 'starting_pre'},
+            {'trigger': 'enter_pre', 'source': 'writing_normal', 'dest': 'writing_pre'},
+
+            # Transitions for exiting pre mode
+            {'trigger': 'exit_pre', 'source': 'starting_pre', 'dest': 'starting_normal'},
+            {'trigger': 'exit_pre', 'source': 'writing_pre', 'dest': 'writing_normal'},
+
+            # Transitions for entering ignoring mode (from any non-ignoring state)
+            {'trigger': 'enter_ignoring', 'source': ['starting_normal', 'starting_pre'], 'dest': 'starting_ignoring'},
+            {'trigger': 'enter_ignoring', 'source': ['writing_normal', 'writing_pre'], 'dest': 'writing_ignoring'},
+
+            # Transitions for exiting ignoring mode (check in_pre to determine destination)
+            {'trigger': 'exit_ignoring', 'source': 'starting_ignoring', 'dest': 'starting_normal', 'conditions': 'is_not_in_pre'},
+            {'trigger': 'exit_ignoring', 'source': 'starting_ignoring', 'dest': 'starting_pre', 'conditions': 'is_in_pre'},
+            {'trigger': 'exit_ignoring', 'source': 'writing_ignoring', 'dest': 'writing_normal', 'conditions': 'is_not_in_pre'},
+            {'trigger': 'exit_ignoring', 'source': 'writing_ignoring', 'dest': 'writing_pre', 'conditions': 'is_in_pre'},
+        ]
+
+        self.machine = Machine(
+            model=self,
+            states=states,
+            transitions=transitions,
+            initial=ContentState.STARTING_NORMAL.value,
+            send_event=True
+        )
+
         LXMLParser.__init__(self, item)
 
-    @property
-    def state(self) -> ContentState:
-        """Compute current state from boolean flags.
+    def is_in_pre(self, event_data=None) -> bool:
+        """Condition for state machine: check if we're in a pre tag."""
+        return self.in_pre
 
-        Note: ignoring takes precedence over in_pre when both are true.
-        """
-        if self.ignoring:
-            return ContentState.STARTING_IGNORING if self.starting else ContentState.WRITING_IGNORING
-        elif self.in_pre:
-            return ContentState.STARTING_PRE if self.starting else ContentState.WRITING_PRE
-        else:
-            return ContentState.STARTING_NORMAL if self.starting else ContentState.WRITING_NORMAL
+    def is_not_in_pre(self, event_data=None) -> bool:
+        """Condition for state machine: check if we're NOT in a pre tag."""
+        return not self.in_pre
+
+    @property
+    def is_ignoring(self) -> bool:
+        """Check if currently in ignoring state."""
+        return self.state in (ContentState.STARTING_IGNORING.value, ContentState.WRITING_IGNORING.value)
+
+    @property
+    def is_in_pre_mode(self) -> bool:
+        """Check if currently in pre mode."""
+        return self.state in (ContentState.STARTING_PRE.value, ContentState.WRITING_PRE.value)
+
+    @property
+    def is_starting(self) -> bool:
+        """Check if we haven't written any content yet."""
+        return self.state in (ContentState.STARTING_NORMAL.value, ContentState.STARTING_PRE.value, ContentState.STARTING_IGNORING.value)
 
     def _enter_pre_mode(self) -> None:
         """Transition to preformatted mode (pre/code tags)."""
-        old_state = self.state
-        self.in_pre = True
-        new_state = self.state
-        logger.debug(f"State transition: {old_state} -> {new_state} (enter_pre_mode)")
+        # Only transition if not already in pre mode or ignoring
+        if not self.is_ignoring and not self.is_in_pre_mode:
+            old_state = self.state
+            self.in_pre = True
+            self.enter_pre()
+            logger.debug(f"State transition: {old_state} -> {self.state} (enter_pre_mode)")
+        else:
+            # Just set the flag for nested pre or when ignoring
+            self.in_pre = True
 
     def _exit_pre_mode(self) -> None:
         """Exit preformatted mode."""
-        old_state = self.state
-        self.in_pre = False
-        new_state = self.state
-        logger.debug(f"State transition: {old_state} -> {new_state} (exit_pre_mode)")
+        # Only transition if currently in pre mode (not ignoring)
+        if self.is_in_pre_mode:
+            old_state = self.state
+            self.in_pre = False
+            self.exit_pre()
+            logger.debug(f"State transition: {old_state} -> {self.state} (exit_pre_mode)")
+        else:
+            # Just clear the flag if we're ignoring or not in pre mode
+            self.in_pre = False
 
     def _enter_ignoring_mode(self) -> None:
         """Transition to ignoring mode (script/style/title/pagenum tags)."""
         old_state = self.state
-        self.ignoring = True
-        new_state = self.state
-        logger.debug(f"State transition: {old_state} -> {new_state} (enter_ignoring_mode)")
+        self.enter_ignoring()
+        logger.debug(f"State transition: {old_state} -> {self.state} (enter_ignoring_mode)")
 
     def _exit_ignoring_mode(self) -> None:
         """Exit ignoring mode."""
         old_state = self.state
-        self.ignoring = False
-        new_state = self.state
-        logger.debug(f"State transition: {old_state} -> {new_state} (exit_ignoring_mode)")
+        self.exit_ignoring()
+        logger.debug(f"State transition: {old_state} -> {self.state} (exit_ignoring_mode)")
 
     def _mark_writing(self) -> None:
         """Mark that we've started writing content (no longer in starting state)."""
-        old_state = self.state
-        self.starting = False
-        new_state = self.state
-        logger.debug(f"State transition: {old_state} -> {new_state} (mark_writing)")
+        if self.is_starting:
+            old_state = self.state
+            self.mark_writing()
+            logger.debug(f"State transition: {old_state} -> {self.state} (mark_writing)")
 
     def handle_starttag(self, tag: str, attrs: _Attrib) -> None:  # type: ignore[override]
-        if self.ignoring:
+        if self.is_ignoring:
             return
         if tag in self._ignored or attrs.get("class", None) == "pagenum":
             self._enter_ignoring_mode()
@@ -167,7 +220,7 @@ class HTMLParser(LXMLParser):
             start = (
                 self.output.tell()
                 + self.startpos
-                + (len(self.add) if not self.starting else 0)
+                + (len(self.add) if not self.is_starting else 0)
                 + (1 if self.final_space else 0)
             )
             if self.node_parsed_callback:
@@ -179,7 +232,7 @@ class HTMLParser(LXMLParser):
             self.link_start = (
                 self.output.tell()
                 + self.startpos
-                + (len(self.add) if not self.starting else 0)
+                + (len(self.add) if not self.is_starting else 0)
                 + (1 if self.final_space else 0)
             )
         if tag in ("dd", "dt"):
@@ -240,9 +293,9 @@ class HTMLParser(LXMLParser):
         self.last_start = tag
 
     def handle_data(self, data: str, start_tag: Optional[str]) -> None:  # type: ignore[override]
-        if self.ignoring:
+        if self.is_ignoring:
             return
-        if self.in_pre:
+        if self.is_in_pre_mode:
             if self.add:
                 self.write_data(self.add)
                 self.add = ""
@@ -262,7 +315,7 @@ class HTMLParser(LXMLParser):
         if data and data[-1] == " ":
             self.final_space = True
             data = data[:-1]
-        if self.starting:
+        if self.is_starting:
             self.initial_space = False
             self.add = ""
         if self.add:
