@@ -1,20 +1,20 @@
 from io import StringIO
 from logging import getLogger
+import posixpath
+import re
 from typing import Callable, Optional, Union
 
-logger = getLogger("html_to_text")
+try:
+    from urllib import unquote  # type: ignore[attr-defined]
+except ImportError:
+    from urllib.parse import unquote
 
 import lxml
 import lxml.etree
 import lxml.html
 from lxml.etree import _Attrib, _Element
 
-try:
-    from urllib import unquote  # type: ignore[attr-defined]
-except ImportError:
-    from urllib.parse import unquote
-import posixpath
-import re
+logger = getLogger("html_to_text")
 
 _collect_string_content = lxml.etree.XPath("string()")
 HR_TEXT = "\n" + ("-" * 80)
