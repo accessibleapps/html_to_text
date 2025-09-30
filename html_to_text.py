@@ -116,11 +116,46 @@ class HTMLParser(LXMLParser):
         else:
             return ContentState.STARTING_NORMAL if self.starting else ContentState.WRITING_NORMAL
 
+    def _enter_pre_mode(self) -> None:
+        """Transition to preformatted mode (pre/code tags)."""
+        old_state = self.state
+        self.in_pre = True
+        new_state = self.state
+        logger.debug(f"State transition: {old_state} -> {new_state} (enter_pre_mode)")
+
+    def _exit_pre_mode(self) -> None:
+        """Exit preformatted mode."""
+        old_state = self.state
+        self.in_pre = False
+        new_state = self.state
+        logger.debug(f"State transition: {old_state} -> {new_state} (exit_pre_mode)")
+
+    def _enter_ignoring_mode(self) -> None:
+        """Transition to ignoring mode (script/style/title/pagenum tags)."""
+        old_state = self.state
+        self.ignoring = True
+        new_state = self.state
+        logger.debug(f"State transition: {old_state} -> {new_state} (enter_ignoring_mode)")
+
+    def _exit_ignoring_mode(self) -> None:
+        """Exit ignoring mode."""
+        old_state = self.state
+        self.ignoring = False
+        new_state = self.state
+        logger.debug(f"State transition: {old_state} -> {new_state} (exit_ignoring_mode)")
+
+    def _mark_writing(self) -> None:
+        """Mark that we've started writing content (no longer in starting state)."""
+        old_state = self.state
+        self.starting = False
+        new_state = self.state
+        logger.debug(f"State transition: {old_state} -> {new_state} (mark_writing)")
+
     def handle_starttag(self, tag: str, attrs: _Attrib) -> None:  # type: ignore[override]
         if self.ignoring:
             return
         if tag in self._ignored or attrs.get("class", None) == "pagenum":
-            self.ignoring = True
+            self._enter_ignoring_mode()
             return
         elif tag in self._block:
             self.add = "\n\n"
@@ -139,7 +174,7 @@ class HTMLParser(LXMLParser):
                 self.heading_stack.append((level, start, None))
         if tag in self._pre_tags:
             self.add = "\n"
-            self.in_pre = True
+            self._enter_pre_mode()
         if tag == "a" and "href" in attrs:
             self.link_start = (
                 self.output.tell()
@@ -183,7 +218,7 @@ class HTMLParser(LXMLParser):
                     pagenum=parse_pagenum(item.attrib["id"]),
                 )
         if tag in self._ignored or item.attrib.get("class", None) == "pagenum":
-            self.ignoring = False
+            self._exit_ignoring_mode()
             return
         if tag in self._block:
             self.add = "\n\n"
@@ -194,7 +229,7 @@ class HTMLParser(LXMLParser):
             if self.node_parsed_callback:
                 self.add_heading_node(tag)
         elif tag in self._pre_tags:
-            self.in_pre = False
+            self._exit_pre_mode()
         elif tag == "a" and "href" in item.attrib and self.node_parsed_callback:
             self.add_link(item)
         elif tag == "hr":
@@ -243,7 +278,7 @@ class HTMLParser(LXMLParser):
         self.output.write(data)
         self.last_newline = data[-1] == "\n"
         self.last_data = data
-        self.starting = False
+        self._mark_writing()
 
     def add_heading_node(self, item: str) -> None:
         """Adds a heading to the list of nodes.
