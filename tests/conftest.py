@@ -54,6 +54,6 @@ def assert_positions():
     return _assert_positions
 
 
-def convert(html: str, callback: Callable[..., dict[str, Union[str, int]]] | None = None, file: str = "") -> str:
+def convert(html: str, callback: Union[Callable[..., dict[str, Union[str, int]]], None] = None, file: str = "") -> str:
     """Helper to convert HTML to text with optional callback and file parameter."""
     return html_to_text(html, node_parsed_callback=callback, file=file)
