@@ -17,6 +17,9 @@ import lxml.html
 from lxml.etree import _Attrib, _Element
 from transitions import Machine
 
+# Type alias for node callback functions
+NodeCallback = Callable[..., dict[str, Union[str, int]]]
+
 logger = getLogger("html_to_text")
 
 
@@ -78,9 +81,7 @@ class HTMLParser(LXMLParser):
     def __init__(
         self,
         item: _Element,
-        node_parsed_callback: Optional[
-            Callable[..., dict[str, Union[str, int]]]
-        ] = None,
+        node_parsed_callback: Union[NodeCallback, None] = None,
         startpos: int = 0,
         file: str = "",
     ) -> None:
@@ -382,7 +383,7 @@ class HTMLParser(LXMLParser):
 
 def html_to_text(
     item: Union[str, _Element],
-    node_parsed_callback: Optional[Callable[..., dict[str, Union[str, int]]]] = None,
+    node_parsed_callback: Union[NodeCallback, None] = None,
     startpos: int = 0,
     file: str = "",
 ) -> str:
