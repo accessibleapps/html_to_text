@@ -6,7 +6,7 @@ from pathlib import Path
 import posixpath
 import re
 import sys
-from typing import Callable, Optional, Union
+from typing import Callable, Dict, Optional, Union
 
 from urllib.parse import unquote
 
@@ -18,7 +18,7 @@ from lxml.etree import _Attrib, _Element
 from transitions import Machine
 
 # Type alias for node callback functions
-NodeCallback = Callable[..., dict[str, Union[str, int]]]
+NodeCallback = Callable[..., Dict[str, Union[str, int]]]
 
 logger = getLogger("html_to_text")
 
