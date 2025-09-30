@@ -23,12 +23,12 @@ logger = getLogger("html_to_text")
 class ContentState(Enum):
     """Represents the current content processing state.
 
-    The state is determined by three boolean flags:
-    - ignoring: whether we're inside ignored tags (script/style/title/pagenum)
-    - in_pre: whether we're inside preformatted tags (pre/code)
-    - starting: whether we've written any content yet (for boundary trimming)
+    The state machine tracks:
+    - Whether we're inside ignored tags (script/style/title/pagenum)
+    - Whether we're inside preformatted tags (pre/code)
+    - Whether we've written any content yet (for boundary trimming)
 
-    Note: ignoring takes precedence over in_pre when both are true.
+    Note: ignoring takes precedence over pre mode when both would be true.
     """
     STARTING_NORMAL = "starting_normal"      # Initial state, no content, normal mode
     STARTING_PRE = "starting_pre"            # No content yet, in pre/code tag
@@ -90,7 +90,7 @@ class HTMLParser(LXMLParser):
         self.output = StringIO()
         self.add = ""
         self.initial_space = False
-        self.in_pre = False  # Track if we're in pre tag for restoration after ignoring
+        self._pre_context = False  # Track if we were in pre mode before entering ignoring
         self.last_data = ""
         self.out: list[str] = [""]
         self.final_space = False
@@ -101,92 +101,89 @@ class HTMLParser(LXMLParser):
         self.last_start = ""
         self.link_start = 0
 
-        # Set up state machine
-        states = [state.value for state in ContentState]
+        # Set up state machine using enum objects directly
+        states = list(ContentState)
         transitions = [
             # Transitions for marking start of writing (any STARTING -> WRITING)
-            {'trigger': 'mark_writing', 'source': 'starting_normal', 'dest': 'writing_normal'},
-            {'trigger': 'mark_writing', 'source': 'starting_pre', 'dest': 'writing_pre'},
-            {'trigger': 'mark_writing', 'source': 'starting_ignoring', 'dest': 'writing_ignoring'},
+            {'trigger': 'mark_writing', 'source': ContentState.STARTING_NORMAL, 'dest': ContentState.WRITING_NORMAL},
+            {'trigger': 'mark_writing', 'source': ContentState.STARTING_PRE, 'dest': ContentState.WRITING_PRE},
+            {'trigger': 'mark_writing', 'source': ContentState.STARTING_IGNORING, 'dest': ContentState.WRITING_IGNORING},
 
             # Transitions for entering pre mode
-            {'trigger': 'enter_pre', 'source': 'starting_normal', 'dest': 'starting_pre'},
-            {'trigger': 'enter_pre', 'source': 'writing_normal', 'dest': 'writing_pre'},
+            {'trigger': 'enter_pre', 'source': ContentState.STARTING_NORMAL, 'dest': ContentState.STARTING_PRE},
+            {'trigger': 'enter_pre', 'source': ContentState.WRITING_NORMAL, 'dest': ContentState.WRITING_PRE},
 
             # Transitions for exiting pre mode
-            {'trigger': 'exit_pre', 'source': 'starting_pre', 'dest': 'starting_normal'},
-            {'trigger': 'exit_pre', 'source': 'writing_pre', 'dest': 'writing_normal'},
+            {'trigger': 'exit_pre', 'source': ContentState.STARTING_PRE, 'dest': ContentState.STARTING_NORMAL},
+            {'trigger': 'exit_pre', 'source': ContentState.WRITING_PRE, 'dest': ContentState.WRITING_NORMAL},
 
             # Transitions for entering ignoring mode (from any non-ignoring state)
-            {'trigger': 'enter_ignoring', 'source': ['starting_normal', 'starting_pre'], 'dest': 'starting_ignoring'},
-            {'trigger': 'enter_ignoring', 'source': ['writing_normal', 'writing_pre'], 'dest': 'writing_ignoring'},
+            # These handle both NORMAL→IGNORING and PRE→IGNORING (e.g., <pre><script>)
+            {'trigger': 'enter_ignoring', 'source': [ContentState.STARTING_NORMAL, ContentState.STARTING_PRE], 'dest': ContentState.STARTING_IGNORING},
+            {'trigger': 'enter_ignoring', 'source': [ContentState.WRITING_NORMAL, ContentState.WRITING_PRE], 'dest': ContentState.WRITING_IGNORING},
 
-            # Transitions for exiting ignoring mode (check in_pre to determine destination)
-            {'trigger': 'exit_ignoring', 'source': 'starting_ignoring', 'dest': 'starting_normal', 'conditions': 'is_not_in_pre'},
-            {'trigger': 'exit_ignoring', 'source': 'starting_ignoring', 'dest': 'starting_pre', 'conditions': 'is_in_pre'},
-            {'trigger': 'exit_ignoring', 'source': 'writing_ignoring', 'dest': 'writing_normal', 'conditions': 'is_not_in_pre'},
-            {'trigger': 'exit_ignoring', 'source': 'writing_ignoring', 'dest': 'writing_pre', 'conditions': 'is_in_pre'},
+            # Transitions for exiting ignoring mode (check _pre_context to determine destination)
+            {'trigger': 'exit_ignoring', 'source': ContentState.STARTING_IGNORING, 'dest': ContentState.STARTING_NORMAL, 'conditions': 'is_not_in_pre'},
+            {'trigger': 'exit_ignoring', 'source': ContentState.STARTING_IGNORING, 'dest': ContentState.STARTING_PRE, 'conditions': 'is_in_pre'},
+            {'trigger': 'exit_ignoring', 'source': ContentState.WRITING_IGNORING, 'dest': ContentState.WRITING_NORMAL, 'conditions': 'is_not_in_pre'},
+            {'trigger': 'exit_ignoring', 'source': ContentState.WRITING_IGNORING, 'dest': ContentState.WRITING_PRE, 'conditions': 'is_in_pre'},
         ]
 
         self.machine = Machine(
             model=self,
             states=states,
             transitions=transitions,
-            initial=ContentState.STARTING_NORMAL.value,
+            initial=ContentState.STARTING_NORMAL,
             send_event=True
         )
 
         LXMLParser.__init__(self, item)
 
     def is_in_pre(self, event_data=None) -> bool:
-        """Condition for state machine: check if we're in a pre tag."""
-        return self.in_pre
+        """Condition for state machine: check if we saved pre context before entering ignoring."""
+        return self._pre_context
 
     def is_not_in_pre(self, event_data=None) -> bool:
-        """Condition for state machine: check if we're NOT in a pre tag."""
-        return not self.in_pre
+        """Condition for state machine: check if we did NOT have pre context before entering ignoring."""
+        return not self._pre_context
 
     @property
     def is_ignoring(self) -> bool:
         """Check if currently in ignoring state."""
-        return self.state in (ContentState.STARTING_IGNORING.value, ContentState.WRITING_IGNORING.value)
+        return self.state in (ContentState.STARTING_IGNORING, ContentState.WRITING_IGNORING)
 
     @property
     def is_in_pre_mode(self) -> bool:
         """Check if currently in pre mode."""
-        return self.state in (ContentState.STARTING_PRE.value, ContentState.WRITING_PRE.value)
+        return self.state in (ContentState.STARTING_PRE, ContentState.WRITING_PRE)
 
     @property
     def is_starting(self) -> bool:
         """Check if we haven't written any content yet."""
-        return self.state in (ContentState.STARTING_NORMAL.value, ContentState.STARTING_PRE.value, ContentState.STARTING_IGNORING.value)
+        return self.state in (ContentState.STARTING_NORMAL, ContentState.STARTING_PRE, ContentState.STARTING_IGNORING)
 
     def _enter_pre_mode(self) -> None:
         """Transition to preformatted mode (pre/code tags)."""
         # Only transition if not already in pre mode or ignoring
         if not self.is_ignoring and not self.is_in_pre_mode:
             old_state = self.state
-            self.in_pre = True
             self.enter_pre()
             logger.debug(f"State transition: {old_state} -> {self.state} (enter_pre_mode)")
-        else:
-            # Just set the flag for nested pre or when ignoring
-            self.in_pre = True
+        # For nested pre tags or when ignoring, no transition needed
 
     def _exit_pre_mode(self) -> None:
         """Exit preformatted mode."""
         # Only transition if currently in pre mode (not ignoring)
         if self.is_in_pre_mode:
             old_state = self.state
-            self.in_pre = False
             self.exit_pre()
             logger.debug(f"State transition: {old_state} -> {self.state} (exit_pre_mode)")
-        else:
-            # Just clear the flag if we're ignoring or not in pre mode
-            self.in_pre = False
+        # For nested pre tags or when ignoring, no transition needed
 
     def _enter_ignoring_mode(self) -> None:
         """Transition to ignoring mode (script/style/title/pagenum tags)."""
+        # Save whether we're in pre mode so we can restore it after ignoring
+        self._pre_context = self.is_in_pre_mode
         old_state = self.state
         self.enter_ignoring()
         logger.debug(f"State transition: {old_state} -> {self.state} (enter_ignoring_mode)")
@@ -196,6 +193,8 @@ class HTMLParser(LXMLParser):
         old_state = self.state
         self.exit_ignoring()
         logger.debug(f"State transition: {old_state} -> {self.state} (exit_ignoring_mode)")
+        # Clear the pre context after exiting ignoring
+        self._pre_context = False
 
     def _mark_writing(self) -> None:
         """Mark that we've started writing content (no longer in starting state)."""
