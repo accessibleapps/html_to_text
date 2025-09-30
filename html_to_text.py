@@ -1,7 +1,10 @@
 from io import StringIO
 from logging import getLogger
+import argparse
+from pathlib import Path
 import posixpath
 import re
+import sys
 from typing import Callable, Optional, Union
 
 try:
@@ -9,6 +12,7 @@ try:
 except ImportError:
     from urllib.parse import unquote
 
+import chardet
 import lxml
 import lxml.etree
 import lxml.html
@@ -297,3 +301,129 @@ def tree_from_string(html: str) -> _Element:
     except lxml.etree.XMLSyntaxError:
         pass
     return lxml.html.fromstring(html)
+
+
+def main() -> int:
+    """Command-line interface for html_to_text."""
+    parser = argparse.ArgumentParser(
+        description="Convert HTML files to plain text",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  %(prog)s input.html                    # Output to input.txt
+  %(prog)s input.html -o output.txt      # Specify output file
+  %(prog)s page.htm -o -                 # Write to stdout
+  %(prog)s - -o output.txt               # Read from stdin
+        """,
+    )
+    parser.add_argument(
+        "input",
+        help="Input HTML file (use '-' for stdin)",
+    )
+    parser.add_argument(
+        "-o",
+        "--output",
+        help="Output text file (default: input filename with .txt extension, use '-' for stdout)",
+    )
+    parser.add_argument(
+        "-f",
+        "--force",
+        action="store_true",
+        help="Overwrite output file if it exists",
+    )
+    parser.add_argument(
+        "-q",
+        "--quiet",
+        action="store_true",
+        help="Suppress status messages",
+    )
+
+    args = parser.parse_args()
+
+    # Read input
+    try:
+        if args.input == "-":
+            html_content = sys.stdin.read()
+            input_path = None
+        else:
+            input_path = Path(args.input)
+            if not input_path.exists():
+                print(f"Error: Input file not found: {args.input}", file=sys.stderr)
+                return 1
+            # Try UTF-8 first, then use chardet for detection
+            try:
+                html_content = input_path.read_text(encoding="utf-8")
+            except UnicodeDecodeError:
+                # Detect encoding with chardet
+                raw_data = input_path.read_bytes()
+                detected = chardet.detect(raw_data)
+                encoding = detected.get("encoding", "utf-8")
+                confidence = detected.get("confidence", 0.0)
+
+                if encoding and confidence > 0.7:
+                    html_content = raw_data.decode(encoding)
+                    if not args.quiet:
+                        print(
+                            f"Note: File decoded using {encoding} encoding (confidence: {confidence:.1%})",
+                            file=sys.stderr,
+                        )
+                else:
+                    # Fall back to latin-1 which can decode any byte sequence
+                    html_content = raw_data.decode("latin-1", errors="replace")
+                    if not args.quiet:
+                        print(
+                            "Note: File decoded using latin-1 fallback encoding",
+                            file=sys.stderr,
+                        )
+    except Exception as e:
+        print(f"Error reading input: {e}", file=sys.stderr)
+        return 1
+
+    # Convert HTML to text
+    try:
+        text_content = html_to_text(html_content)
+    except Exception as e:
+        print(f"Error converting HTML: {e}", file=sys.stderr)
+        return 1
+
+    # Determine output path
+    if args.output:
+        output_path = args.output
+    elif input_path:
+        # Use just the filename (no directory) and replace extension with .txt
+        filename = input_path.name
+        if input_path.suffix.lower() in {".html", ".htm"}:
+            output_filename = Path(filename).with_suffix(".txt")
+            output_path = str(output_filename)
+        else:
+            output_path = filename + ".txt"
+    else:
+        # Reading from stdin, write to stdout
+        output_path = "-"
+
+    # Write output
+    try:
+        if output_path == "-":
+            sys.stdout.write(text_content)
+        else:
+            output_file = Path(output_path)
+            if output_file.exists() and not args.force:
+                print(
+                    f"Error: Output file already exists: {output_path}",
+                    file=sys.stderr,
+                )
+                print("Use -f/--force to overwrite", file=sys.stderr)
+                return 1
+
+            output_file.write_text(text_content, encoding="utf-8")
+            if not args.quiet:
+                print(f"Converted {args.input} -> {output_path}")
+    except Exception as e:
+        print(f"Error writing output: {e}", file=sys.stderr)
+        return 1
+
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
