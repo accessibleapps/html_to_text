@@ -76,6 +76,15 @@ class TestPagenumTracking:
         # p-prefixed page numbers get prefix stripped and lowercased
         assert pages[0]["pagenum"] == "xvii"
 
+    def test_pagenum_unparseable(self, simple_callback):
+        callback, nodes = simple_callback
+        html = '<span class="pagenum" id="unparseable_id">ignored</span>'
+        convert(html, callback)
+
+        pages = [n for n in nodes if n["type"] == "page"]
+        # Unparseable page numbers return None
+        assert pages[0]["pagenum"] is None
+
     def test_pagenum_between_content(self, simple_callback):
         callback, nodes = simple_callback
         html = 'text<span class="pagenum" id="page1">1</span>more'

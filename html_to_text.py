@@ -153,9 +153,6 @@ class HTMLParser(LXMLParser):
         if tag in self._ignored or item.attrib.get("class", None) == "pagenum":
             self.ignoring = False
             return
-        if tag in self._ignored:
-            self.ignoring = False
-            return
         if tag in self._block:
             self.add = "\n\n"
         elif tag == "br":
