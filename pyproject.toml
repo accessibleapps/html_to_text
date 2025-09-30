@@ -10,7 +10,6 @@ readme = "README.md"
 requires-python = ">=3.8"
 dependencies = [
     "chardet>=5.2.0",
-    "css-inline>=0.15.0",
     "lxml",
     "transitions>=0.9.0",
 ]
