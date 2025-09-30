@@ -64,8 +64,8 @@ class TestHRTag:
 
     def test_hr_between_text(self):
         result = convert("before<hr>after")
-        # HR has \n at end, plus tail newlines
-        assert result == f"before{HR_TEXT}\n\nafter"
+        # HR adds its line, tail text follows
+        assert result == f"before{HR_TEXT}after"
 
     def test_hr_in_paragraph(self):
         html = "<p>text<hr></p>"
@@ -134,8 +134,8 @@ class TestSpecialTagCombinations:
     def test_hr_then_br(self):
         html = "<hr><br>text"
         result = convert(html)
-        # HR ends with \n, BR adds \n, plus spacing
-        assert result == f"{HR_TEXT}\n\n\ntext"
+        # HR ends with \n, BR adds \n
+        assert result == f"{HR_TEXT}\ntext"
 
     def test_br_in_definition_list(self):
         html = "<dt>term<br>continued</dt>"

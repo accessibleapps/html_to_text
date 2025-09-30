@@ -415,7 +415,14 @@ def tree_from_string(html: str) -> _Element:
         return lxml.etree.fromstring(html)
     except lxml.etree.XMLSyntaxError:
         pass
-    return lxml.html.fromstring(html)
+    # fragment_fromstring is more forgiving, so check for empty/whitespace first
+    if not html or not html.strip():
+        raise lxml.etree.ParserError("Document is empty")
+    # Use fragment_fromstring with explicit parent container to ensure
+    # consistent parsing behavior. lxml.html.fromstring() has unpredictable
+    # auto-correction that wraps fragments differently across platforms.
+    # Using 'span' as parent since it's inline and won't add extra spacing.
+    return lxml.html.fragment_fromstring(html, create_parent='span')
 
 
 def main() -> int:

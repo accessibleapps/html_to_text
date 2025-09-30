@@ -40,11 +40,8 @@ class TestIgnoredTagsWithText:
 
     def test_text_before_and_after_ignored(self, tag):
         html = f"before<{tag}>ignored</{tag}>after"
-        # Title tag adds block spacing, others don't
-        if tag == "title":
-            assert convert(html) == "before\n\nafter"
-        else:
-            assert convert(html) == "beforeafter"
+        # All ignored tags behave the same - content is stripped
+        assert convert(html) == "beforeafter"
 
 
 @pytest.mark.parametrize("tag", ["script", "style", "title"])
