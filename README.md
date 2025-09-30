@@ -5,7 +5,13 @@ Converts HTML to plain text. Preserves structure, handles tables, and can track 
 ## Installation
 
 ```bash
-pip install html_to_text
+pip install git+https://github.com/accessibleapps/html_to_text.git
+```
+
+Or with uv:
+
+```bash
+uv pip install git+https://github.com/accessibleapps/html_to_text.git
 ```
 
 ## Basic Usage
