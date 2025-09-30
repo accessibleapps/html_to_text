@@ -7,10 +7,7 @@ import re
 import sys
 from typing import Callable, Optional, Union
 
-try:
-    from urllib import unquote  # type: ignore[attr-defined]
-except ImportError:
-    from urllib.parse import unquote
+from urllib.parse import unquote
 
 import chardet
 import lxml
@@ -61,7 +58,9 @@ class HTMLParser(LXMLParser):
     def __init__(
         self,
         item: _Element,
-        node_parsed_callback: Optional[Callable[..., dict[str, Union[str, int]]]] = None,
+        node_parsed_callback: Optional[
+            Callable[..., dict[str, Union[str, int]]]
+        ] = None,
         startpos: int = 0,
         file: str = "",
     ) -> None:
@@ -291,7 +290,7 @@ def parse_pagenum(num: str) -> Optional[str]:
     elif num.startswith("p"):
         return num[1:].lower()
     else:
-        logger.warn("unable to parse page %r" % num)
+        logger.warning("unable to parse page %r" % num)
         return None
 
 
