@@ -1,6 +1,6 @@
 """Shared fixtures and helpers for html_to_text tests."""
 
-from typing import Any, Dict, Union
+from typing import Any, Dict, List, Union
 
 import pytest
 
@@ -39,7 +39,7 @@ def simple_callback():
 @pytest.fixture
 def assert_positions():
     """Helper to verify start/end positions match actual content."""
-    def _assert_positions(text: str, nodes: list[dict[str, Any]]) -> None:
+    def _assert_positions(text: str, nodes: List[Dict[str, Any]]) -> None:
         """Verify all nodes with start/end have valid positions."""
         for node in nodes:
             if "start" in node:
