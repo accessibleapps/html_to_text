@@ -1,6 +1,7 @@
 from io import StringIO
 from logging import getLogger
 import argparse
+from enum import Enum
 from pathlib import Path
 import posixpath
 import re
@@ -16,6 +17,24 @@ import lxml.html
 from lxml.etree import _Attrib, _Element
 
 logger = getLogger("html_to_text")
+
+
+class ContentState(Enum):
+    """Represents the current content processing state.
+
+    The state is determined by three boolean flags:
+    - ignoring: whether we're inside ignored tags (script/style/title/pagenum)
+    - in_pre: whether we're inside preformatted tags (pre/code)
+    - starting: whether we've written any content yet (for boundary trimming)
+
+    Note: ignoring takes precedence over in_pre when both are true.
+    """
+    STARTING_NORMAL = "starting_normal"      # Initial state, no content, normal mode
+    STARTING_PRE = "starting_pre"            # No content yet, in pre/code tag
+    STARTING_IGNORING = "starting_ignoring"  # No content yet, ignoring content
+    WRITING_NORMAL = "writing_normal"        # Writing normal content
+    WRITING_PRE = "writing_pre"              # Writing preformatted content
+    WRITING_IGNORING = "writing_ignoring"    # Ignoring content after having written something
 
 _collect_string_content = lxml.etree.XPath("string()")
 HR_TEXT = "\n" + ("-" * 80)
@@ -83,6 +102,19 @@ class HTMLParser(LXMLParser):
         self.last_start = ""
         self.link_start = 0
         LXMLParser.__init__(self, item)
+
+    @property
+    def state(self) -> ContentState:
+        """Compute current state from boolean flags.
+
+        Note: ignoring takes precedence over in_pre when both are true.
+        """
+        if self.ignoring:
+            return ContentState.STARTING_IGNORING if self.starting else ContentState.WRITING_IGNORING
+        elif self.in_pre:
+            return ContentState.STARTING_PRE if self.starting else ContentState.WRITING_PRE
+        else:
+            return ContentState.STARTING_NORMAL if self.starting else ContentState.WRITING_NORMAL
 
     def handle_starttag(self, tag: str, attrs: _Attrib) -> None:  # type: ignore[override]
         if self.ignoring:

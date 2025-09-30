@@ -12,6 +12,7 @@ dependencies = [
     "chardet>=5.2.0",
     "css-inline>=0.15.0",
     "lxml",
+    "transitions>=0.9.0",
 ]
 
 [dependency-groups]
