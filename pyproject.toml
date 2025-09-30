@@ -17,6 +17,8 @@ dependencies = [
 [dependency-groups]
 dev = [
     "pyright>=1.1.405",
+    "pytest>=8.0.0",
+    "pytest-cov>=6.0.0",
     "ruff>=0.13.2",
     "types-lxml>=2025.8.25",
 ]
