@@ -1,6 +1,6 @@
 """Shared fixtures and helpers for html_to_text tests."""
 
-from typing import Any, Union
+from typing import Any, Dict, Union
 
 import pytest
 
@@ -21,7 +21,7 @@ def simple_callback():
         node_type: str,
         name: Union[str, int, None],
         **kwargs: Any
-    ) -> dict[str, Union[str, int]]:
+    ) -> Dict[str, Union[str, int]]:
         counter["id"] += 1
         node = {
             "id": counter["id"],
