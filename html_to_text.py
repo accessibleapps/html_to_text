@@ -19,6 +19,7 @@ from transitions import Machine
 
 # Type alias for node callback functions
 NodeCallback = Callable[..., Dict[str, Union[str, int]]]
+StyleCallback = Callable[[_Element, int, int], None]
 
 logger = getLogger("html_to_text")
 
@@ -88,10 +89,12 @@ class HTMLParser(LXMLParser):
         node_parsed_callback: Union[NodeCallback, None] = None,
         startpos: int = 0,
         file: str = "",
+        style_callback: Union[StyleCallback, None] = None,
     ) -> None:
         self.node_parsed_callback = node_parsed_callback
         self.startpos = startpos
         self.file = file
+        self.style_callback = style_callback
         self.output = StringIO()
         self.add = ""
         self.initial_space = False
@@ -106,6 +109,7 @@ class HTMLParser(LXMLParser):
         self.table_stack: list[dict[str, Union[str, int]]] = []
         self.last_newline = False
         self.last_start = ""
+        self.element_stack: list[tuple[_Element, int]] = []  # Track (element, start_pos)
         self.link_start = 0
 
         # Set up state machine using enum objects directly
@@ -197,6 +201,20 @@ class HTMLParser(LXMLParser):
         )
 
         LXMLParser.__init__(self, item)
+
+    def parse_tag(self, item: _Element) -> None:
+        """Override to track element positions for style callback."""
+        # Track start position for this element
+        if self.style_callback is not None:
+            start_pos = self.output.tell() + self.startpos
+            self.element_stack.append((item, start_pos))
+
+        # Call parent's parse_tag
+        super().parse_tag(item)
+
+        # Pop from stack if we pushed
+        if self.style_callback is not None:
+            self.element_stack.pop()
 
     def is_in_pre(self, event_data=None) -> bool:
         """Condition for state machine: check if we saved pre context before entering ignoring."""
@@ -365,6 +383,16 @@ class HTMLParser(LXMLParser):
         elif tag in self._table_tags and self.node_parsed_callback:
             self.table_stack[-1]["end"] = self.output.tell() + self.startpos
             self.table_stack.pop()
+
+        # Call style callback if element has style attribute
+        if self.style_callback is not None and item.get('style') is not None:
+            # Find this element's start position from stack
+            if self.element_stack:
+                element, start_pos = self.element_stack[-1]
+                if element == item:
+                    end_pos = self.output.tell() + self.startpos
+                    self.style_callback(item, start_pos, end_pos)
+
         self.last_start = tag
 
     def handle_data(self, data: str, start_tag: Optional[str]) -> None:  # type: ignore[override]
@@ -461,11 +489,12 @@ def html_to_text(
     node_parsed_callback: Union[NodeCallback, None] = None,
     startpos: int = 0,
     file: str = "",
+    style_callback: Union[StyleCallback, None] = None,
 ) -> str:
     if isinstance(item, str):
         item = tree_from_string(item)
     lxml.html.xhtml_to_html(item)  # type: ignore[arg-type]
-    parser = HTMLParser(item, node_parsed_callback, startpos, file)
+    parser = HTMLParser(item, node_parsed_callback, startpos, file, style_callback)
     text = parser.output.getvalue()
     if parser.last_page is not None:
         parser.last_page["end"] = parser.output.tell()
