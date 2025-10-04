@@ -515,7 +515,7 @@ def parse_pagenum(num: str) -> Optional[str]:
         return None
 
 
-def tree_from_string(html: str) -> _Element:
+def tree_from_string(html: Union[str, bytes]) -> _Element:
     try:
         return lxml.etree.fromstring(html)
     except lxml.etree.XMLSyntaxError:
@@ -525,11 +525,19 @@ def tree_from_string(html: str) -> _Element:
         raise lxml.etree.ParserError("Document is empty")
 
     # Detect if this is a full HTML document vs a fragment
-    html_stripped = html.strip()
-    is_full_document = (
-        html_stripped.lower().startswith('<!doctype') or
-        html_stripped.lower().startswith('<html')
-    )
+    # Handle both bytes and str input
+    if isinstance(html, bytes):
+        html_stripped = html.strip()
+        is_full_document = (
+            html_stripped.lower().startswith(b'<!doctype') or
+            html_stripped.lower().startswith(b'<html')
+        )
+    else:
+        html_stripped = html.strip()
+        is_full_document = (
+            html_stripped.lower().startswith('<!doctype') or
+            html_stripped.lower().startswith('<html')
+        )
 
     if is_full_document:
         # Full HTML documents should be parsed as documents to preserve structure
