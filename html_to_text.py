@@ -529,12 +529,14 @@ def tree_from_string(html: Union[str, bytes]) -> _Element:
     if isinstance(html, bytes):
         html_stripped = html.strip()
         is_full_document = (
+            html_stripped.lower().startswith(b'<?xml') or
             html_stripped.lower().startswith(b'<!doctype') or
             html_stripped.lower().startswith(b'<html')
         )
     else:
         html_stripped = html.strip()
         is_full_document = (
+            html_stripped.lower().startswith('<?xml') or
             html_stripped.lower().startswith('<!doctype') or
             html_stripped.lower().startswith('<html')
         )
