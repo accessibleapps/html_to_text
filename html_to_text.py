@@ -523,11 +523,23 @@ def tree_from_string(html: str) -> _Element:
     # fragment_fromstring is more forgiving, so check for empty/whitespace first
     if not html or not html.strip():
         raise lxml.etree.ParserError("Document is empty")
-    # Use fragment_fromstring with explicit parent container to ensure
-    # consistent parsing behavior. lxml.html.fromstring() has unpredictable
-    # auto-correction that wraps fragments differently across platforms.
-    # Using 'span' as parent since it's inline and won't add extra spacing.
-    return lxml.html.fragment_fromstring(html, create_parent="span")
+
+    # Detect if this is a full HTML document vs a fragment
+    html_stripped = html.strip()
+    is_full_document = (
+        html_stripped.lower().startswith('<!doctype') or
+        html_stripped.lower().startswith('<html')
+    )
+
+    if is_full_document:
+        # Full HTML documents should be parsed as documents to preserve structure
+        return lxml.html.fromstring(html)
+    else:
+        # Use fragment_fromstring with explicit parent container to ensure
+        # consistent parsing behavior. lxml.html.fromstring() has unpredictable
+        # auto-correction that wraps fragments differently across platforms.
+        # Using 'span' as parent since it's inline and won't add extra spacing.
+        return lxml.html.fragment_fromstring(html, create_parent="span")
 
 
 def main() -> int:
