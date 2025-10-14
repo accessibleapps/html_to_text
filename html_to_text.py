@@ -6,7 +6,7 @@ from pathlib import Path
 import posixpath
 import re
 import sys
-from typing import Callable, Dict, Optional, Union
+from typing import Callable, Dict, Optional, Union, Any
 
 from urllib.parse import unquote
 
@@ -82,6 +82,17 @@ class HTMLParser(LXMLParser):
     whitespace_re = re.compile(r"\s+")
     _block = ("p", "div", "center", "blockquote")
     heading_levels = {"h1": 1, "h2": 2, "h3": 3, "h4": 4, "h5": 5, "h6": 6}
+    # Semantic HTML tags that imply styling
+    SEMANTIC_STYLES = {
+        'b': {'font-weight': 'bold'},
+        'strong': {'font-weight': 'bold'},
+        'i': {'font-style': 'italic'},
+        'em': {'font-style': 'italic'},
+        'u': {'text-decoration': 'underline'},
+        's': {'text-decoration': 'line-through'},
+        'strike': {'text-decoration': 'line-through'},
+        'del': {'text-decoration': 'line-through'},
+    }
 
     def __init__(
         self,
@@ -111,6 +122,7 @@ class HTMLParser(LXMLParser):
         self.last_start = ""
         self.element_stack: list[tuple[_Element, int]] = []  # Track (element, start_pos)
         self.link_start = 0
+        self.semantic_style_stack: list[dict[str, Any]] = []  # Track active semantic styles
 
         # Set up state machine using enum objects directly
         states = list(ContentState)
@@ -350,6 +362,19 @@ class HTMLParser(LXMLParser):
                 attrs=dict(attrs),
             )
             self.table_stack.append(node)
+        # Track semantic tags for style extraction
+        if tag in self.SEMANTIC_STYLES and self.style_callback:
+            start_pos = (
+                self.output.tell()
+                + self.startpos
+                + (len(self.add) if not self.is_starting else 0)
+                + (1 if self.final_space else 0)
+            )
+            self.semantic_style_stack.append({
+                'tag': tag,
+                'start': start_pos,
+                'styles': self.SEMANTIC_STYLES[tag].copy()
+            })
 
     def handle_endtag(self, tag: str, item: _Element) -> None:  # type: ignore[override]
         if "class" in item.attrib and item.attrib["class"] == "pagenum":
@@ -392,6 +417,32 @@ class HTMLParser(LXMLParser):
                 if element == item:
                     end_pos = self.output.tell() + self.startpos
                     self.style_callback(item, start_pos, end_pos)
+
+        # Process semantic tags for style extraction
+        if tag in self.SEMANTIC_STYLES and self.style_callback and self.semantic_style_stack:
+            # Find matching tag on stack (handle nesting - pop most recent matching tag)
+            for i in range(len(self.semantic_style_stack) - 1, -1, -1):
+                if self.semantic_style_stack[i]['tag'] == tag:
+                    style_info = self.semantic_style_stack.pop(i)
+                    end_pos = self.output.tell() + self.startpos
+
+                    # Only create style node if there's actual content
+                    if end_pos > style_info['start']:
+                        # Create a mock element with style attribute for the callback
+                        # Convert our dict format (font_weight) to CSS format (font-weight)
+                        css_properties = []
+                        for prop_key, prop_value in style_info['styles'].items():
+                            css_prop = prop_key.replace('_', '-')
+                            css_properties.append(f"{css_prop}: {prop_value}")
+                        style_str = '; '.join(css_properties)
+
+                        # Create mock element and set style attribute
+                        mock_element = lxml.etree.Element(tag)
+                        mock_element.set('style', style_str)
+
+                        # Call style callback with mock element
+                        self.style_callback(mock_element, style_info['start'], end_pos)
+                    break
 
         self.last_start = tag
 
