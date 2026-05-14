@@ -1,7 +1,5 @@
 """Tests for table structure tracking."""
 
-import pytest
-
 from tests.conftest import convert
 
 
@@ -131,9 +129,16 @@ class TestTablePositions:
         table_nodes = [n for n in nodes if n["type"] in ["table", "tr", "td"]]
         assert_positions(text, table_nodes)
 
+    def test_empty_table_in_paragraph_positions(self, simple_callback, assert_positions):
+        callback, nodes = simple_callback
+        text = convert("<p><table><tr><td></td></tr></table></p>", callback)
+
+        table_nodes = [n for n in nodes if n["type"] in ["table", "tr", "td"]]
+        assert_positions(text, table_nodes)
+
     def test_table_start_before_content(self, simple_callback):
         callback, nodes = simple_callback
-        text = convert("<table><tr><td>cell</td></tr></table>", callback)
+        convert("<table><tr><td>cell</td></tr></table>", callback)
 
         table = [n for n in nodes if n["type"] == "table"][0]
         td = [n for n in nodes if n["type"] == "td"][0]
@@ -143,7 +148,7 @@ class TestTablePositions:
 
     def test_table_end_after_content(self, simple_callback):
         callback, nodes = simple_callback
-        text = convert("<table><tr><td>cell</td></tr></table>", callback)
+        convert("<table><tr><td>cell</td></tr></table>", callback)
 
         table = [n for n in nodes if n["type"] == "table"][0]
         td = [n for n in nodes if n["type"] == "td"][0]
