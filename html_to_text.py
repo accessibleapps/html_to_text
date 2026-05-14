@@ -6,7 +6,7 @@ from pathlib import Path
 import posixpath
 import re
 import sys
-from typing import Callable, Dict, Optional, Union, Any
+from typing import Callable, Dict, Optional, Union, Any, cast
 
 from urllib.parse import unquote
 
@@ -86,6 +86,13 @@ class LXMLParser(object):
 
 
 class HTMLParser(LXMLParser):
+    state: ContentState
+    enter_pre: Callable[[], None]
+    exit_pre: Callable[[], None]
+    enter_ignoring: Callable[[], None]
+    exit_ignoring: Callable[[], None]
+    mark_writing: Callable[[], None]
+
     _heading_tags = "h1 h2 h3 h4 h5 h6".split(" ")
     _pre_tags = ("pre", "code")
     _table_tags = ("table", "tr", "td", "th", "thead", "tbody", "tfoot")
@@ -128,7 +135,7 @@ class HTMLParser(LXMLParser):
         self.final_space = False
         self.heading_stack: list[tuple[int, int, Union[str, int, None]]] = []
         self.last_page: Optional[dict[str, Union[str, int]]] = None
-        self.table_stack: list[dict[str, Union[str, int]]] = []
+        self.table_stack: list[dict[str, Any]] = []
         self.last_newline = False
         self.last_start = ""
         self.element_stack: list[tuple[_Element, int]] = []  # Track (element, start_pos)
@@ -419,16 +426,22 @@ class HTMLParser(LXMLParser):
             self.table_stack.pop()
 
         # Call style callback if element has style attribute
-        if self.style_callback is not None and item.get('style') is not None:
+        style_callback = self.style_callback
+        style_callback_call = cast(Any, style_callback)
+        if style_callback is not None and item.get('style') is not None:
             # Find this element's start position from stack
             if self.element_stack:
                 element, start_pos = self.element_stack[-1]
                 if element == item:
                     end_pos = self.output.tell() + self.startpos
-                    self.style_callback(item, start_pos, end_pos)
+                    style_callback_call(item, start_pos, end_pos)
 
         # Process semantic tags for style extraction
-        if tag in self.SEMANTIC_STYLES and self.style_callback and self.semantic_style_stack:
+        if (
+            tag in self.SEMANTIC_STYLES
+            and style_callback is not None
+            and self.semantic_style_stack
+        ):
             # Find matching tag on stack (handle nesting - pop most recent matching tag)
             for i in range(len(self.semantic_style_stack) - 1, -1, -1):
                 if self.semantic_style_stack[i]['tag'] == tag:
@@ -450,7 +463,7 @@ class HTMLParser(LXMLParser):
                         mock_element.set('style', style_str)
 
                         # Call style callback with mock element
-                        self.style_callback(mock_element, style_info['start'], end_pos)
+                        style_callback_call(mock_element, style_info['start'], end_pos)
                     break
 
         self.last_start = tag

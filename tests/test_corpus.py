@@ -17,7 +17,9 @@ CORPUS_DIR = Path(__file__).resolve().parents[1] / "sample"
 def corpus_files() -> list[Path | None]:
     if not CORPUS_DIR.exists():
         return [None]
-    return sorted(CORPUS_DIR.glob("*.html"))[:CORPUS_LIMIT]
+    files: list[Path | None] = []
+    files.extend(sorted(CORPUS_DIR.glob("*.html"))[:CORPUS_LIMIT])
+    return files
 
 
 @pytest.mark.parametrize("path", corpus_files(), ids=lambda path: "missing" if path is None else path.name)
