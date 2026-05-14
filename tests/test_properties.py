@@ -132,3 +132,18 @@ def test_pre_text_preserves_tabs(text: str) -> None:
     rendered = html_to_text(f"<pre>{escape(text)}</pre>")
     if assume_has_tab:
         assert "\t" in rendered
+
+
+@settings(max_examples=200, deadline=None)
+@given(html_fragments())
+def test_style_callback_positions_are_in_output_bounds(fragment: str) -> None:
+    spans: list[tuple[int, int]] = []
+
+    def style_callback(element: object, start: int, end: int) -> None:
+        spans.append((start, end))
+
+    text = html_to_text(fragment, style_callback=style_callback)
+    for start, end in spans:
+        assert 0 <= start <= len(text)
+        assert 0 <= end <= len(text)
+        assert start <= end
