@@ -2,6 +2,7 @@
 
 
 from tests.conftest import convert
+from html_to_text import html_to_text, tree_from_string
 
 
 class TestEmptyAndMinimal:
@@ -21,6 +22,16 @@ class TestEmptyAndMinimal:
 
     def test_single_word(self):
         assert convert("word") == "word"
+
+    def test_bytes_full_document(self):
+        tree = tree_from_string(b"<html><body><p>bytes</p></body></html>")
+
+        assert html_to_text(tree) == "bytes"
+
+    def test_bytes_fragment(self):
+        tree = tree_from_string(b"<p>bytes</p>")
+
+        assert html_to_text(tree) == "bytes"
 
     def test_empty_paragraph(self):
         assert convert("<p></p>") == ""
