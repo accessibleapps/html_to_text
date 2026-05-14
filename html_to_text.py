@@ -269,6 +269,15 @@ class HTMLParser(LXMLParser):
             ContentState.STARTING_IGNORING,
         )
 
+    def _pending_output_offset(self) -> int:
+        """Return output length that will be written before the next content."""
+        if self.is_starting:
+            return 0
+        return len(self.add) + (1 if self.final_space else 0)
+
+    def _position_after_pending_output(self) -> int:
+        return self.output.tell() + self.startpos + self._pending_output_offset()
+
     def _enter_pre_mode(self) -> None:
         """Transition to preformatted mode (pre/code tags)."""
         # Only transition if not already in pre mode or ignoring
@@ -333,24 +342,14 @@ class HTMLParser(LXMLParser):
             self.add = "\n\n"
             self.final_space = False
             level = self.heading_levels[tag]
-            start = (
-                self.output.tell()
-                + self.startpos
-                + (len(self.add) if not self.is_starting else 0)
-                + (1 if self.final_space else 0)
-            )
+            start = self._position_after_pending_output()
             if self.node_parsed_callback:
                 self.heading_stack.append((level, start, None))
         if tag in self._pre_tags:
             self.add = "\n"
             self._enter_pre_mode()
         if tag == "a" and "href" in attrs:
-            self.link_start = (
-                self.output.tell()
-                + self.startpos
-                + (len(self.add) if not self.is_starting else 0)
-                + (1 if self.final_space else 0)
-            )
+            self.link_start = self._position_after_pending_output()
         if tag in ("dd", "dt"):
             self.add = "\n"
         if "id" in attrs and self.node_parsed_callback:
@@ -358,7 +357,7 @@ class HTMLParser(LXMLParser):
                 None,
                 "id",
                 self.file + "#" + attrs["id"],
-                start=self.output.tell() + self.startpos + len(self.add),
+                start=self._position_after_pending_output(),
             )
         if tag in self._table_tags and self.node_parsed_callback:
             if self.table_stack:
@@ -369,18 +368,13 @@ class HTMLParser(LXMLParser):
                 parent,
                 tag,
                 None,
-                start=self.output.tell() + self.startpos + len(self.add),
+                start=self._position_after_pending_output(),
                 attrs=dict(attrs),
             )
             self.table_stack.append(node)
         # Track semantic tags for style extraction
         if tag in self.SEMANTIC_STYLES and self.style_callback:
-            start_pos = (
-                self.output.tell()
-                + self.startpos
-                + (len(self.add) if not self.is_starting else 0)
-                + (1 if self.final_space else 0)
-            )
+            start_pos = self._position_after_pending_output()
             self.semantic_style_stack.append({
                 'tag': tag,
                 'start': start_pos,
@@ -559,7 +553,7 @@ def html_to_text(
     parser = HTMLParser(item, node_parsed_callback, startpos, file, style_callback)
     text = parser.output.getvalue()
     if parser.last_page is not None:
-        parser.last_page["end"] = parser.output.tell()
+        parser.last_page["end"] = parser.output.tell() + startpos
     return text
 
 
@@ -584,7 +578,7 @@ def tree_from_string(html: Union[str, bytes]) -> _Element:
         pass
     # fragment_fromstring is more forgiving, so check for empty/whitespace first
     if not html or not html.strip():
-        raise lxml.etree.ParserError("Document is empty")
+        return lxml.html.Element("span")
 
     # Detect if this is a full HTML document vs a fragment
     # Handle both bytes and str input
