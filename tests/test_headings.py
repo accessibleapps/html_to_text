@@ -205,6 +205,15 @@ class TestHeadingPositions:
         assert headings[0]["start"] < headings[0]["end"]
         assert headings[0]["end"] <= headings[1]["start"]
 
+    def test_empty_heading_after_pending_break_positions(
+        self, simple_callback, assert_positions
+    ):
+        callback, nodes = simple_callback
+        text = convert("<br><h1></h1>", callback)
+
+        headings = [n for n in nodes if n["type"] == "heading"]
+        assert_positions(text, headings)
+
 
 class TestHeadingMetadata:
     """Test heading metadata (level, tag)."""
