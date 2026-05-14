@@ -1,9 +1,31 @@
 """Tests for state machine behavior."""
 
 
-from html_to_text import ContentState, HTMLParser
+import pytest
+
+from html_to_text import ContentState, HTMLParser, LXMLParser
 from lxml import html as lxml_html
 from tests.conftest import convert
+
+
+class TestLXMLParserContract:
+    """Test abstract parser hook contract."""
+
+    def test_base_hooks_raise_not_implemented(self):
+        tree = lxml_html.fromstring("<p>text</p>")
+
+        class NoParseParser(LXMLParser):
+            def parse_tag(self, item):
+                pass
+
+        parser = NoParseParser(tree)
+
+        with pytest.raises(NotImplementedError):
+            parser.handle_starttag("p", tree.attrib)
+        with pytest.raises(NotImplementedError):
+            parser.handle_data("text", "p")
+        with pytest.raises(NotImplementedError):
+            parser.handle_endtag("p", tree)
 
 
 class TestStateProperty:
