@@ -1,6 +1,5 @@
 """Tests for edge cases, empty documents, and malformed HTML."""
 
-import pytest
 
 from tests.conftest import convert
 
@@ -9,22 +8,13 @@ class TestEmptyAndMinimal:
     """Test empty and minimal documents."""
 
     def test_empty_string(self):
-        # lxml raises ParserError on empty documents
-        from lxml.etree import ParserError
-        with pytest.raises(ParserError):
-            convert("")
+        assert convert("") == ""
 
     def test_whitespace_only(self):
-        # lxml raises ParserError on whitespace-only documents
-        from lxml.etree import ParserError
-        with pytest.raises(ParserError):
-            convert("   ")
+        assert convert("   ") == ""
 
     def test_newlines_only(self):
-        # lxml raises ParserError on newline-only documents
-        from lxml.etree import ParserError
-        with pytest.raises(ParserError):
-            convert("\n\n\n")
+        assert convert("\n\n\n") == ""
 
     def test_single_character(self):
         assert convert("a") == "a"
