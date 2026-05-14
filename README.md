@@ -38,6 +38,20 @@ First paragraph with bold text.
 Second paragraph.
 ```
 
+## Command Line
+
+After installation, convert a file with:
+
+```bash
+html-to-text input.html -o output.txt
+```
+
+Use `-` to read from stdin or write to stdout:
+
+```bash
+html-to-text - -o -
+```
+
 ## Features
 
 - **Structure preservation**: Block elements (`<p>`, `<div>`, `<h1-h6>`) get appropriate spacing
@@ -130,6 +144,22 @@ text = html_to_text(html, node_parsed_callback=track_elements)
 
 - Python ≥ 3.8
 - lxml
+- chardet
+- transitions
+
+## Development
+
+Run the test suite with:
+
+```bash
+uv run pytest
+```
+
+Run lint checks with:
+
+```bash
+uv run ruff check .
+```
 
 ## Example: Building a Document Index
 
@@ -169,4 +199,4 @@ for item in doc_structure:
 
 ## License
 
-See LICENSE file.
+No license file is present in this repository.
