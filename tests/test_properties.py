@@ -14,7 +14,6 @@ from html_to_text import html_to_text
 INLINE_TAGS = ("span", "em", "strong", "b", "i", "u", "a")
 BLOCK_TAGS = ("p", "div", "blockquote", "center", "h1", "h2", "h3")
 IGNORED_TAGS = ("script", "style", "title")
-TABLE_TAGS = ("table", "tr", "td", "th", "thead", "tbody", "tfoot")
 
 
 def escaped_text() -> st.SearchStrategy[str]:
@@ -28,11 +27,6 @@ def escaped_text() -> st.SearchStrategy[str]:
     ).map(escape)
 
 
-def non_empty_escaped_text() -> st.SearchStrategy[str]:
-    """Text safe to embed as a non-empty generated HTML fragment."""
-    return escaped_text().filter(lambda text: bool(text.strip()))
-
-
 @st.composite
 def html_fragments(draw: st.DrawFn, max_depth: int = 3) -> str:
     """Generate small, parseable HTML fragments."""
@@ -41,7 +35,7 @@ def html_fragments(draw: st.DrawFn, max_depth: int = 3) -> str:
 
     choice = draw(st.integers(min_value=0, max_value=5))
     if choice == 0:
-        return draw(non_empty_escaped_text())
+        return draw(escaped_text())
 
     if choice == 1:
         tag = draw(st.sampled_from(INLINE_TAGS))
@@ -102,8 +96,6 @@ def test_callback_positions_are_in_output_bounds(fragment: str) -> None:
 
     text = html_to_text(fragment, node_parsed_callback=callback, file="chapter.html")
     for node in nodes:
-        if node["type"] in TABLE_TAGS:
-            continue
         start = node.get("start")
         end = node.get("end")
         if start is not None:

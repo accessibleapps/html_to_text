@@ -411,7 +411,11 @@ class HTMLParser(LXMLParser):
         elif tag == "hr":
             self.output.write(HR_TEXT)
         elif tag in self._table_tags and self.node_parsed_callback:
-            self.table_stack[-1]["end"] = self.output.tell() + self.startpos
+            table_node = self.table_stack[-1]
+            end = self.output.tell() + self.startpos
+            if table_node["start"] > end:
+                table_node["start"] = end
+            table_node["end"] = end
             self.table_stack.pop()
 
         # Call style callback if element has style attribute
@@ -497,6 +501,8 @@ class HTMLParser(LXMLParser):
         We can't have an end heading without a start heading."""
         (level, start, node_id) = self.heading_stack.pop()
         end = self.output.tell() + self.startpos
+        if start > end:
+            start = end
         while self.need_heading_pop(level):
             self.heading_stack.pop()
         # The last element of the stack is our parent. If it's empty, we have no parent.
@@ -530,12 +536,13 @@ class HTMLParser(LXMLParser):
                 posixpath.join(posixpath.dirname(self.file), href)
             )
         if self.node_parsed_callback is not None:
+            end = self.output.tell() + self.startpos
             self.node_parsed_callback(
                 None,
                 "link",
                 text,
-                start=self.link_start,
-                end=self.output.tell() + self.startpos,
+                start=min(self.link_start, end),
+                end=end,
                 href=href,
             )
 
