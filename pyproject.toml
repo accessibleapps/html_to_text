@@ -8,11 +8,29 @@ version = "0.12"
 description = "Converts HTML to text"
 readme = "README.md"
 requires-python = ">=3.8"
+keywords = ["html", "text", "accessibility", "parser"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Text Processing :: Markup :: HTML",
+]
 dependencies = [
     "chardet>=5.2.0",
     "lxml",
     "transitions>=0.9.0",
 ]
+
+[project.urls]
+Repository = "https://github.com/accessibleapps/html_to_text"
+
+[project.scripts]
+html-to-text = "html_to_text:main"
 
 [dependency-groups]
 dev = [
