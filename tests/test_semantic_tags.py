@@ -1,7 +1,5 @@
 """Tests for semantic HTML tag style extraction."""
-import pytest
 from html_to_text import html_to_text
-from lxml import etree
 
 
 def test_bold_tag_creates_style():
@@ -19,7 +17,7 @@ def test_bold_tag_creates_style():
             'end': end
         })
 
-    text = html_to_text(html, style_callback=style_callback)
+    html_to_text(html, style_callback=style_callback)
 
     # Should find one style node for <b>
     assert len(styles_found) == 1
@@ -42,7 +40,7 @@ def test_italic_tag_creates_style():
             'end': end
         })
 
-    text = html_to_text(html, style_callback=style_callback)
+    html_to_text(html, style_callback=style_callback)
 
     assert len(styles_found) == 1
     assert 'font-style: italic' in styles_found[0]['style']
@@ -57,7 +55,7 @@ def test_em_tag_creates_style():
     def style_callback(element, start, end):
         styles_found.append({'style': element.get('style')})
 
-    text = html_to_text(html, style_callback=style_callback)
+    html_to_text(html, style_callback=style_callback)
 
     assert len(styles_found) == 1
     assert 'font-style: italic' in styles_found[0]['style']
@@ -72,7 +70,7 @@ def test_strong_tag_creates_style():
     def style_callback(element, start, end):
         styles_found.append({'style': element.get('style')})
 
-    text = html_to_text(html, style_callback=style_callback)
+    html_to_text(html, style_callback=style_callback)
 
     assert len(styles_found) == 1
     assert 'font-weight: bold' in styles_found[0]['style']
@@ -87,7 +85,7 @@ def test_underline_tag_creates_style():
     def style_callback(element, start, end):
         styles_found.append({'style': element.get('style')})
 
-    text = html_to_text(html, style_callback=style_callback)
+    html_to_text(html, style_callback=style_callback)
 
     assert len(styles_found) == 1
     assert 'text-decoration: underline' in styles_found[0]['style']
@@ -108,7 +106,7 @@ def test_nested_semantic_tags():
             'text_range': (start, end)
         })
 
-    text = html_to_text(html, style_callback=style_callback)
+    html_to_text(html, style_callback=style_callback)
 
     # Should have 2 style nodes: one for <b>, one for <i>
     assert len(styles_found) == 2
@@ -140,7 +138,7 @@ def test_multiple_separate_semantic_tags():
             'style': element.get('style')
         })
 
-    text = html_to_text(html, style_callback=style_callback)
+    html_to_text(html, style_callback=style_callback)
 
     # Should have 3 separate style nodes
     assert len(styles_found) == 3
@@ -163,7 +161,7 @@ def test_semantic_tag_with_existing_style_attribute():
             'style': element.get('style')
         })
 
-    text = html_to_text(html, style_callback=style_callback)
+    html_to_text(html, style_callback=style_callback)
 
     # Should have TWO style callbacks:
     # 1. One from the original <b style="color: red"> (line 388-394)
@@ -185,7 +183,7 @@ def test_empty_semantic_tag():
     def style_callback(element, start, end):
         styles_found.append({'tag': element.tag})
 
-    text = html_to_text(html, style_callback=style_callback)
+    html_to_text(html, style_callback=style_callback)
 
     # Empty tag should not create a style node (start == end check)
     assert len(styles_found) == 0
@@ -235,7 +233,7 @@ def test_strikethrough_tags():
             'style': element.get('style')
         })
 
-    text = html_to_text(html, style_callback=style_callback)
+    html_to_text(html, style_callback=style_callback)
 
     assert len(styles_found) == 2
     for style_info in styles_found:
@@ -266,7 +264,7 @@ def test_semantic_tags_with_callback():
                 'style': style
             })
 
-    text = html_to_text(html, style_callback=callback)
+    html_to_text(html, style_callback=callback)
 
     # Should find at least 4 style nodes: <b>, <em>, <i>, and <span>
     assert len(nodes) >= 4

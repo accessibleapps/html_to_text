@@ -1,6 +1,5 @@
 """Tests for special tags (BR, HR, DD, DT)."""
 
-import pytest
 
 from html_to_text import HR_TEXT
 from tests.conftest import convert

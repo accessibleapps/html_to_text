@@ -1,7 +1,5 @@
 """Tests for state machine behavior."""
 
-from io import StringIO
-import pytest
 
 from html_to_text import ContentState, HTMLParser
 from lxml import html as lxml_html
@@ -114,7 +112,7 @@ class TestStateTransitionsDuringParsing:
                 super().write_data(data)
 
         tree = lxml_html.fromstring("<p>text</p>")
-        parser = StateTrackingParser(tree)
+        StateTrackingParser(tree)
 
         # Should transition from STARTING_NORMAL to WRITING_NORMAL
         assert ContentState.STARTING_NORMAL in states_seen or ContentState.WRITING_NORMAL in states_seen
@@ -129,7 +127,7 @@ class TestStateTransitionsDuringParsing:
                 super().handle_data(data, start_tag)
 
         tree = lxml_html.fromstring("<pre>preformatted</pre>")
-        parser = StateTrackingParser(tree)
+        StateTrackingParser(tree)
 
         # Should see PRE states
         pre_states = [s for s, _ in states_seen if s in (ContentState.STARTING_PRE, ContentState.WRITING_PRE)]
@@ -145,7 +143,7 @@ class TestStateTransitionsDuringParsing:
                 super().handle_data(data, start_tag)
 
         tree = lxml_html.fromstring("<p>before</p><script>ignored</script><p>after</p>")
-        parser = StateTrackingParser(tree)
+        StateTrackingParser(tree)
 
         # Should see NORMAL states (ignored content doesn't call handle_data)
         assert ContentState.WRITING_NORMAL in states_seen
@@ -164,7 +162,7 @@ class TestStateTransitionsDuringParsing:
                 super().handle_endtag(tag, item)
 
         tree = lxml_html.fromstring('<pre>before<span class="pagenum">1</span>after</pre>')
-        parser = StateTrackingParser(tree)
+        StateTrackingParser(tree)
 
         # Should see transitions: PRE -> IGNORING -> PRE
         state_sequence = [s for _, _, s in states_seen]

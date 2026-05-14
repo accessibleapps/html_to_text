@@ -1,6 +1,5 @@
 """Integration tests with complex multi-feature documents."""
 
-import pytest
 
 from tests.conftest import convert
 

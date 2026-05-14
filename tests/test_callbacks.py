@@ -113,7 +113,7 @@ class TestPagenumTracking:
         text<span class="pagenum" id="page1">1</span>more
         <span class="pagenum" id="page2">2</span>end
         '''
-        text = convert(html, callback)
+        convert(html, callback)
 
         pages = [n for n in nodes if n["type"] == "page"]
         # First page end should be set when second page starts
@@ -152,7 +152,7 @@ class TestPositionAccuracy:
         # Convert with startpos offset
         html = '<h1>Title</h1>'
         from html_to_text import html_to_text
-        text = html_to_text(html, node_parsed_callback=callback, startpos=100)
+        html_to_text(html, node_parsed_callback=callback, startpos=100)
 
         headings = [n for n in nodes if n["type"] == "heading"]
         # Positions should include the offset
@@ -161,7 +161,7 @@ class TestPositionAccuracy:
     def test_id_position(self, simple_callback):
         callback, nodes = simple_callback
         html = '<p id="test">text</p>'
-        text = convert(html, callback)
+        convert(html, callback)
 
         id_nodes = [n for n in nodes if n["type"] == "id"]
         # ID position accounts for paragraph's pending \n\n

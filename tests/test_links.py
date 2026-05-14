@@ -1,6 +1,5 @@
 """Tests for link handling and extraction."""
 
-import pytest
 
 from tests.conftest import convert
 

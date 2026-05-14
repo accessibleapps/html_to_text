@@ -1,6 +1,5 @@
 """Tests for whitespace normalization - the most complex parsing behavior."""
 
-import pytest
 
 from tests.conftest import convert
 
