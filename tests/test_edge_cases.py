@@ -28,6 +28,11 @@ class TestEmptyAndMinimal:
 
         assert html_to_text(tree) == "bytes"
 
+    def test_malformed_bytes_full_document(self):
+        tree = tree_from_string(b"<!doctype html><html><body><p>bytes</p></body></html>")
+
+        assert html_to_text(tree) == "bytes"
+
     def test_bytes_fragment(self):
         tree = tree_from_string(b"<p>bytes</p>")
 
