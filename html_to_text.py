@@ -23,6 +23,17 @@ StyleCallback = Callable[[_Element, int, int], None]
 
 logger = getLogger("html_to_text")
 
+__all__ = [
+    "ContentState",
+    "HTMLParser",
+    "NodeCallback",
+    "StyleCallback",
+    "html_to_text",
+    "main",
+    "parse_pagenum",
+    "tree_from_string",
+]
+
 
 class ContentState(Enum):
     """Represents the current content processing state.
