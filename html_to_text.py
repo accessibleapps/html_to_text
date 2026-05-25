@@ -379,6 +379,10 @@ class HTMLParser(LXMLParser):
                 attrs=dict(attrs),
             )
             self.table_stack.append(node)
+        if tag == "img":
+            alt = attrs.get("alt")
+            if alt:
+                self.handle_data(alt, "img")
         # Track semantic tags for style extraction
         if tag in self.SEMANTIC_STYLES and self.style_callback:
             start_pos = self._position_after_pending_output()
