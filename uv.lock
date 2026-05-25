@@ -311,7 +311,7 @@ wheels = [
 
 [[package]]
 name = "html-to-text"
-version = "0.12"
+version = "0.14"
 source = { editable = "." }
 dependencies = [
     { name = "chardet" },
