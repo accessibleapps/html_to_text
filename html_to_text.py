@@ -6,7 +6,7 @@ from pathlib import Path
 import posixpath
 import re
 import sys
-from typing import Callable, Dict, Optional, Union, Any, cast
+from typing import Callable, Dict, Optional, Union, Any, List, cast
 
 from urllib.parse import unquote
 
@@ -58,6 +58,220 @@ class ContentState(Enum):
 
 _collect_string_content = lxml.etree.XPath("string()")
 HR_TEXT = "\n" + ("-" * 80)
+MATHML_NAMESPACE = "http://www.w3.org/1998/Math/MathML"
+_MATHML_ANNOTATION_ENCODINGS = (
+    "application/x-tex",
+    "application/x-latex",
+    "application/tex",
+    "application/latex",
+    "text/plain",
+    "tex",
+    "latex",
+)
+_MATHML_SPACE_AROUND_OPERATORS = {
+    "+",
+    "-",
+    "=",
+    "<",
+    ">",
+    "\u2260",
+    "\u2264",
+    "\u2265",
+    "\u00d7",
+    "\u00f7",
+    "\u00b1",
+    "\u2213",
+    "\u2212",
+    "\u2208",
+    "\u2209",
+    "\u220b",
+    "\u2282",
+    "\u2283",
+    "\u2286",
+    "\u2287",
+    "\u222a",
+    "\u2229",
+    "\u2192",
+    "\u2190",
+    "\u2194",
+    "\u21d2",
+    "\u21d0",
+    "\u21d4",
+}
+_MATHML_NO_LEADING_SPACE = {")", "]", "}", ",", ";", ":"}
+_MATHML_NO_TRAILING_SPACE = {"(", "[", "{"}
+_MATHML_INVISIBLE_OPERATORS = {"\u2061", "\u2062", "\u2063", "\u2064"}
+
+
+def _local_name(tag: Any) -> str:
+    """Return an element's namespace-free local tag name."""
+    if not isinstance(tag, str):
+        return str(tag)
+    if tag.startswith("{"):
+        return tag.rpartition("}")[2].lower()
+    return tag.lower()
+
+
+def _normalize_math_text(text: str) -> str:
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def _math_string_content(item: _Element) -> str:
+    return _normalize_math_text(cast(str, _collect_string_content(item)))
+
+
+def _is_mathml_element(item: _Element, local_name: str = "math") -> bool:
+    return _local_name(item.tag) == local_name
+
+
+def _mathml_annotation_text(item: _Element) -> Optional[str]:
+    for child in item.iter():
+        tag = _local_name(child.tag)
+        if tag not in ("annotation", "annotation-xml"):
+            continue
+        encoding = child.attrib.get("encoding", "").strip().lower()
+        if (
+            encoding in _MATHML_ANNOTATION_ENCODINGS
+            or "tex" in encoding
+            or "latex" in encoding
+            or "text" in encoding
+        ):
+            text = _math_string_content(child)
+            if text:
+                return text
+    return None
+
+
+def _parenthesize_math_part(text: str) -> str:
+    if not text or re.fullmatch(r"[\w.]+", text, flags=re.UNICODE):
+        return text
+    if text.startswith("(") and text.endswith(")"):
+        return text
+    return f"({text})"
+
+
+def _join_math_parts(parts: List[str]) -> str:
+    output = ""
+    for raw_part in parts:
+        part = _normalize_math_text(raw_part)
+        if not part:
+            continue
+        if part in _MATHML_INVISIBLE_OPERATORS:
+            if output and not output.endswith(" "):
+                output += " "
+            continue
+        if part in _MATHML_SPACE_AROUND_OPERATORS:
+            output = output.rstrip()
+            if output:
+                output += " "
+            output += part
+            output += " "
+        elif part in _MATHML_NO_LEADING_SPACE:
+            output = output.rstrip() + part
+            if part in {",", ";"}:
+                output += " "
+        elif output.endswith(tuple(_MATHML_NO_TRAILING_SPACE)) or output.endswith(("^", "_", "/")):
+            output += part
+        elif part in _MATHML_NO_TRAILING_SPACE:
+            if output and not output.endswith(" "):
+                output += " "
+            output += part
+        elif output and not output.endswith(" "):
+            output += " " + part
+        else:
+            output += part
+    return _normalize_math_text(output)
+
+
+def _linearize_mathml(item: _Element) -> str:
+    tag = _local_name(item.tag)
+
+    if tag in ("annotation", "annotation-xml"):
+        return ""
+
+    if tag == "semantics":
+        for child in item:
+            if _local_name(child.tag) not in ("annotation", "annotation-xml"):
+                return _linearize_mathml(child)
+        return ""
+
+    if tag in ("mi", "mn", "mo", "mtext", "ms"):
+        return _math_string_content(item)
+
+    if tag == "msup" and len(item) >= 2:
+        base = _linearize_mathml(item[0])
+        superscript = _parenthesize_math_part(_linearize_mathml(item[1]))
+        return f"{base}^{superscript}"
+
+    if tag == "msub" and len(item) >= 2:
+        base = _linearize_mathml(item[0])
+        subscript = _parenthesize_math_part(_linearize_mathml(item[1]))
+        return f"{base}_{subscript}"
+
+    if tag == "msubsup" and len(item) >= 3:
+        base = _linearize_mathml(item[0])
+        subscript = _parenthesize_math_part(_linearize_mathml(item[1]))
+        superscript = _parenthesize_math_part(_linearize_mathml(item[2]))
+        return f"{base}_{subscript}^{superscript}"
+
+    if tag == "mfrac" and len(item) >= 2:
+        numerator = _parenthesize_math_part(_linearize_mathml(item[0]))
+        denominator = _parenthesize_math_part(_linearize_mathml(item[1]))
+        return f"{numerator}/{denominator}"
+
+    if tag == "msqrt":
+        return f"sqrt({_join_math_parts([_linearize_mathml(child) for child in item])})"
+
+    if tag == "mroot" and len(item) >= 2:
+        base = _linearize_mathml(item[0])
+        index = _linearize_mathml(item[1])
+        return f"root[{index}]({base})"
+
+    if tag == "mfenced":
+        open_fence = item.attrib.get("open", "(")
+        close_fence = item.attrib.get("close", ")")
+        separators = item.attrib.get("separators", ",")
+        separator = separators[0] if separators else ","
+        body = f"{separator} ".join(
+            part
+            for part in (_linearize_mathml(child) for child in item)
+            if part
+        )
+        return f"{open_fence}{body}{close_fence}"
+
+    if tag == "mtable":
+        return "; ".join(
+            part
+            for part in (_linearize_mathml(child) for child in item)
+            if part
+        )
+
+    if tag == "mtr":
+        return ", ".join(
+            part
+            for part in (_linearize_mathml(child) for child in item)
+            if part
+        )
+
+    if tag == "mtd":
+        return _join_math_parts([_linearize_mathml(child) for child in item])
+
+    parts = []
+    if item.text and tag not in ("math", "mrow", "mstyle"):
+        parts.append(item.text)
+    parts.extend(_linearize_mathml(child) for child in item)
+    return _join_math_parts(parts)
+
+
+def _extract_mathml_text(item: _Element) -> str:
+    for attr in ("alttext", "alt", "aria-label"):
+        value = item.attrib.get(attr)
+        if value:
+            return _normalize_math_text(value)
+    annotation = _mathml_annotation_text(item)
+    if annotation:
+        return annotation
+    return _linearize_mathml(item)
 
 
 class LXMLParser(object):
@@ -66,12 +280,13 @@ class LXMLParser(object):
 
     def parse_tag(self, item: _Element) -> None:
         if item.tag != lxml.etree.Comment and item.tag != lxml.etree.PI:
-            self.handle_starttag(str(item.tag), item.attrib)
+            tag = _local_name(item.tag)
+            self.handle_starttag(tag, item.attrib)
             if item.text is not None:
-                self.handle_data(item.text, str(item.tag))
+                self.handle_data(item.text, tag)
             for tag in item:
                 self.parse_tag(tag)
-            self.handle_endtag(str(item.tag), item)
+            self.handle_endtag(_local_name(item.tag), item)
         if item.tail:
             self.handle_data(item.tail, None)
 
@@ -234,6 +449,12 @@ class HTMLParser(LXMLParser):
 
     def parse_tag(self, item: _Element) -> None:
         """Override to track element positions for style callback."""
+        if _is_mathml_element(item) and not self.is_ignoring:
+            self.handle_mathml(item)
+            if item.tail:
+                self.handle_data(item.tail, None)
+            return
+
         # Track start position for this element
         if self.style_callback is not None:
             start_pos = self.output.tell() + self.startpos
@@ -245,6 +466,31 @@ class HTMLParser(LXMLParser):
         # Pop from stack if we pushed
         if self.style_callback is not None:
             self.element_stack.pop()
+
+    def handle_mathml(self, item: _Element) -> None:
+        math_text = _extract_mathml_text(item)
+        if not math_text:
+            return
+
+        start = self._position_after_pending_output()
+        self.handle_data(math_text, "math")
+        end = self.output.tell() + self.startpos
+        if self.node_parsed_callback is not None:
+            self.node_parsed_callback(
+                None,
+                "math",
+                math_text,
+                start=min(start, end),
+                end=end,
+                display=item.attrib.get("display", "inline"),
+                attrs=dict(item.attrib),
+                mathml=lxml.etree.tostring(
+                    item,
+                    encoding="unicode",
+                    method="xml",
+                    with_tail=False,
+                ),
+            )
 
     def is_in_pre(self, event_data=None) -> bool:
         """Condition for state machine: check if we saved pre context before entering ignoring."""
