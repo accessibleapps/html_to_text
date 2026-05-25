@@ -60,6 +60,8 @@ html-to-text - -o -
 - **Pre-formatted text**: `<pre>` and `<code>` blocks preserve whitespace
 - **Heading hierarchy**: Tracks document structure through heading levels
 - **Element tracking**: Optional callbacks for building document indexes
+- **MathML extraction**: MathML is converted to accessible inline text and can
+  be tracked as a structural `math` node
 
 ## API
 
@@ -112,6 +114,7 @@ text = html_to_text(html, node_parsed_callback=track_elements)
 |------|--------|---------|--------|
 | `heading` | Parent heading ID | None | `start`, `end`, `tag`, `level` |
 | `link` | None | Link text | `start`, `end`, `href` |
+| `math` | None | Extracted math text | `start`, `end`, `display`, `attrs`, `mathml` |
 | `table` | Parent table ID | None | `start`, `attrs` |
 | `tr`, `td`, `th` | Parent table element ID | None | `start`, `attrs` |
 | `id` | None | Element ID | `start` |
@@ -137,6 +140,11 @@ text = html_to_text(html, node_parsed_callback=track_elements)
 **Pre-formatted (`<pre>`, `<code>`)**: Whitespace preserved exactly.
 
 **Links**: Text extracted; URLs captured via callbacks if provided.
+
+**MathML**: Prefers `alttext`, `alt`, or `aria-label`, then text/TeX
+annotations, then a structured presentation fallback for common MathML
+constructs. The extracted math enters the plain text stream; callbacks receive a
+`math` node with the emitted text span and raw MathML.
 
 **Tables**: Structure tracked via callbacks; text extracted in reading order.
 
