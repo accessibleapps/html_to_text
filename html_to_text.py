@@ -604,6 +604,9 @@ class HTMLParser(LXMLParser):
             self.link_start = self._position_after_pending_output()
         if tag in ("dd", "dt"):
             self.add = "\n"
+        if self.style_callback is not None and self.element_stack:
+            element, _ = self.element_stack[-1]
+            self.element_stack[-1] = (element, self._position_after_pending_output())
         if "id" in attrs and self.node_parsed_callback:
             self.node_parsed_callback(
                 None,
@@ -683,7 +686,7 @@ class HTMLParser(LXMLParser):
                 element, start_pos = self.element_stack[-1]
                 if element == item:
                     end_pos = self.output.tell() + self.startpos
-                    style_callback_call(item, start_pos, end_pos)
+                    style_callback_call(item, min(start_pos, end_pos), end_pos)
 
         # Process semantic tags for style extraction
         if (
