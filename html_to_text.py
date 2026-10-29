@@ -3,12 +3,11 @@ from logging import getLogger
 import argparse
 from enum import Enum
 from pathlib import Path
-import posixpath
 import re
 import sys
 from typing import Callable, Dict, Optional, Union, Any, List, cast
 
-from urllib.parse import unquote
+from urllib.parse import unquote, urljoin, urlsplit
 
 import chardet
 import lxml
@@ -40,7 +39,7 @@ class ContentState(Enum):
 
     The state machine tracks:
     - Whether we're inside ignored tags (script/style/title/pagenum)
-    - Whether we're inside preformatted tags (pre/code)
+    - Whether we're inside preformatted tags (pre)
     - Whether we've written any content yet (for boundary trimming)
 
     Note: ignoring takes precedence over pre mode when both would be true.
@@ -309,7 +308,7 @@ class HTMLParser(LXMLParser):
     mark_writing: Callable[[], None]
 
     _heading_tags = "h1 h2 h3 h4 h5 h6".split(" ")
-    _pre_tags = ("pre", "code")
+    _pre_tags = ("pre",)
     _table_tags = ("table", "tr", "td", "th", "thead", "tbody", "tfoot")
     _ignored = ["script", "style", "title"]
     whitespace_re = re.compile(r"\s+")
@@ -532,7 +531,7 @@ class HTMLParser(LXMLParser):
         return self.output.tell() + self.startpos + self._pending_output_offset()
 
     def _enter_pre_mode(self) -> None:
-        """Transition to preformatted mode (pre/code tags)."""
+        """Transition to preformatted mode (pre tags)."""
         # Only transition if not already in pre mode or ignoring
         if not self.is_ignoring and not self.is_in_pre_mode:
             old_state = self.state
@@ -605,6 +604,9 @@ class HTMLParser(LXMLParser):
             self.link_start = self._position_after_pending_output()
         if tag in ("dd", "dt"):
             self.add = "\n"
+        if self.style_callback is not None and self.element_stack:
+            element, _ = self.element_stack[-1]
+            self.element_stack[-1] = (element, self._position_after_pending_output())
         if "id" in attrs and self.node_parsed_callback:
             self.node_parsed_callback(
                 None,
@@ -684,7 +686,7 @@ class HTMLParser(LXMLParser):
                 element, start_pos = self.element_stack[-1]
                 if element == item:
                     end_pos = self.output.tell() + self.startpos
-                    style_callback_call(item, start_pos, end_pos)
+                    style_callback_call(item, min(start_pos, end_pos), end_pos)
 
         # Process semantic tags for style extraction
         if (
@@ -793,11 +795,9 @@ class HTMLParser(LXMLParser):
         text = _collect_string_content(item)
         # Is this an internal link?
         href = item.attrib["href"]
-        if "://" not in href:
-            href = unquote(item.attrib["href"])
-            href = posixpath.normpath(
-                posixpath.join(posixpath.dirname(self.file), href)
-            )
+        reference = urlsplit(href)
+        if not reference.scheme and not reference.netloc:
+            href = unquote(urljoin(self.file, href))
         if self.node_parsed_callback is not None:
             end = self.output.tell() + self.startpos
             self.node_parsed_callback(

@@ -130,12 +130,13 @@ class TestInternalLinks:
 
     def test_fragment_link(self, simple_callback):
         callback, nodes = simple_callback
-        html = '<a href="#anchor">text</a>'
+        html = '<a href="#anchor">text</a><p id="anchor">target</p>'
         convert(html, callback, file="page.html")
 
         links = [n for n in nodes if n["type"] == "link"]
-        # Fragment-only links become just the fragment
-        assert links[0]["href"] == "#anchor"
+        target = next(n for n in nodes if n["type"] == "id")
+        assert links[0]["href"] == "page.html#anchor"
+        assert links[0]["href"] == target["name"]
 
     def test_url_encoded_link(self, simple_callback):
         callback, nodes = simple_callback
