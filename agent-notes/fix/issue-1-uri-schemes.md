@@ -10,6 +10,7 @@ Source change: import urlsplit, parse href, and normalize only references with n
 TDD command, from this worktree: `.venv/Scripts/python.exe -B -m pytest tests/test_uri_schemes.py -q`. Before the source fix:5 failed,4 passed. The NVDA anchor failed with actual href docs/mailto:info@nvaccess.org versus expected mailto:info@nvaccess.org; tel/urn and scheme-relative encoding cases also failed. After the source fix:9 passed. Cases include actual NVDA text ranges, mailto query encoding, tel,urn,https,authority references, and relative/parent/encoded archive paths. No full suite, linter or package build was run locally; PR CI remains root's responsibility.
 
 # Surprises
+PR6 CI failed before tests because ubuntu-latest moved to26.04 and setup-python could not install3.9 there. The official actions/python-versions manifest lists24.04 binaries for every existing3.8-3.12 matrix entry. Pin the existing runner to24.04, retaining the complete Python matrix and test command. No new guard or relaxed check.
 uv sync --locked rejected the committed lock because the machine's global exclude-newer cutoff requests re-resolution. Use --frozen to consume the committed graph without unrelated dependency changes, in this worktree's own environment.
 
 # Next step
