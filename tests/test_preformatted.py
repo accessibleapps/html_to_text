@@ -1,37 +1,38 @@
-"""Tests for preformatted content (pre and code tags)."""
+"""Tests for preformatted blocks and inline code."""
 
 import pytest
+from pathlib import Path
 
 from tests.conftest import convert
 
 
 @pytest.mark.parametrize("tag", ["pre", "code"])
 class TestPreformattedBasics:
-    """Test basic pre/code tag behavior."""
+    """Preserve pre whitespace and normalize inline code whitespace."""
 
     def test_preserves_single_space(self, tag):
         html = f"<{tag}>a b</{tag}>"
-        assert convert(html) == "\na b"
+        assert convert(html) == ("\na b" if tag == "pre" else "a b")
 
     def test_preserves_multiple_spaces(self, tag):
         html = f"<{tag}>a    b</{tag}>"
-        assert convert(html) == "\na    b"
+        assert convert(html) == ("\na    b" if tag == "pre" else "a b")
 
     def test_preserves_newlines(self, tag):
         html = f"<{tag}>a\nb</{tag}>"
-        assert convert(html) == "\na\nb"
+        assert convert(html) == ("\na\nb" if tag == "pre" else "a b")
 
     def test_preserves_multiple_newlines(self, tag):
         html = f"<{tag}>a\n\n\nb</{tag}>"
-        assert convert(html) == "\na\n\n\nb"
+        assert convert(html) == ("\na\n\n\nb" if tag == "pre" else "a b")
 
     def test_preserves_tabs(self, tag):
         html = f"<{tag}>a\tb</{tag}>"
-        assert convert(html) == "\na\tb"
+        assert convert(html) == ("\na\tb" if tag == "pre" else "a b")
 
     def test_preserves_mixed_whitespace(self, tag):
         html = f"<{tag}>a  \t\n  b</{tag}>"
-        assert convert(html) == "\na  \t\n  b"
+        assert convert(html) == ("\na  \t\n  b" if tag == "pre" else "a b")
 
 
 @pytest.mark.parametrize("tag", ["pre", "code"])
@@ -40,23 +41,23 @@ class TestPreformattedLeadingTrailing:
 
     def test_preserves_leading_space(self, tag):
         html = f"<{tag}> leading</{tag}>"
-        assert convert(html) == "\n leading"
+        assert convert(html) == ("\n leading" if tag == "pre" else "leading")
 
     def test_preserves_trailing_space(self, tag):
         html = f"<{tag}>trailing </{tag}>"
-        assert convert(html) == "\ntrailing "
+        assert convert(html) == ("\ntrailing " if tag == "pre" else "trailing")
 
     def test_preserves_leading_newline(self, tag):
         html = f"<{tag}>\ntext</{tag}>"
-        assert convert(html) == "\n\ntext"
+        assert convert(html) == ("\n\ntext" if tag == "pre" else "text")
 
     def test_preserves_trailing_newline(self, tag):
         html = f"<{tag}>text\n</{tag}>"
-        assert convert(html) == "\ntext\n"
+        assert convert(html) == ("\ntext\n" if tag == "pre" else "text")
 
     def test_preserves_leading_trailing_whitespace(self, tag):
         html = f"<{tag}>  text  </{tag}>"
-        assert convert(html) == "\n  text  "
+        assert convert(html) == ("\n  text  " if tag == "pre" else "text")
 
 
 @pytest.mark.parametrize("tag", ["pre", "code"])
@@ -70,11 +71,11 @@ class TestPreformattedEmpty:
 
     def test_whitespace_only(self, tag):
         html = f"<{tag}>   </{tag}>"
-        assert convert(html) == "\n   "
+        assert convert(html) == ("\n   " if tag == "pre" else "")
 
     def test_newlines_only(self, tag):
         html = f"<{tag}>\n\n</{tag}>"
-        assert convert(html) == "\n\n\n"
+        assert convert(html) == ("\n\n\n" if tag == "pre" else "")
 
 
 class TestPreformattedWithOtherElements:
@@ -107,7 +108,7 @@ class TestNestedPreAndCode:
 
     def test_code_inside_pre(self):
         html = "<pre><code>code</code></pre>"
-        # Both are pre tags, whitespace preserved
+        # Code inherits preformatted whitespace from its pre parent.
         assert convert(html) == "\ncode"
 
     def test_pre_inside_code(self):
@@ -178,3 +179,24 @@ class TestPreformattedStateManagement:
         # Each pre tag should work independently
         # Tail text follows immediately after closing tag
         assert convert(html) == "\na  btext\nc  d"
+
+
+class TestInlineCode:
+    def test_real_nvda_sentence_stays_inline(self):
+        raw = (Path(__file__).parent / "fixtures" / "nvda-inline-code.html").read_text(
+            encoding="utf-8"
+        )
+        assert convert(raw) == (
+            "On Windows 11, NVDA will no longer announce emoji panel items twice while browsing them. "
+            "Performance and reliability in the Start Menu on Windows 11 24H2 has been improved. "
+            "On Windows 11 24H2 and newer, window state will be announced when resizing windows with "
+            "Windows+arrow keys. Support has also been added for Windows 11 Voice Access."
+        )
+
+    def test_inline_code_uses_normal_paragraph_spacing(self):
+        assert convert("<p>Use <code>a   b\nc</code> now.</p>") == "Use a b c now."
+
+    def test_code_inside_pre_preserves_remaining_preformatted_context(self):
+        assert convert("<pre>before<code>  code  </code>  after\n    indented</pre>") == (
+            "\nbefore  code    after\n    indented"
+        )
