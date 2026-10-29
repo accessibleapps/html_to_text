@@ -8,7 +8,7 @@ import re
 import sys
 from typing import Callable, Dict, Optional, Union, Any, List, cast
 
-from urllib.parse import unquote
+from urllib.parse import unquote, urlsplit
 
 import chardet
 import lxml
@@ -793,7 +793,8 @@ class HTMLParser(LXMLParser):
         text = _collect_string_content(item)
         # Is this an internal link?
         href = item.attrib["href"]
-        if "://" not in href:
+        reference = urlsplit(href)
+        if not reference.scheme and not reference.netloc:
             href = unquote(item.attrib["href"])
             href = posixpath.normpath(
                 posixpath.join(posixpath.dirname(self.file), href)
