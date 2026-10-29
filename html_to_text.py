@@ -39,7 +39,7 @@ class ContentState(Enum):
 
     The state machine tracks:
     - Whether we're inside ignored tags (script/style/title/pagenum)
-    - Whether we're inside preformatted tags (pre/code)
+    - Whether we're inside preformatted tags (pre)
     - Whether we've written any content yet (for boundary trimming)
 
     Note: ignoring takes precedence over pre mode when both would be true.
@@ -308,7 +308,7 @@ class HTMLParser(LXMLParser):
     mark_writing: Callable[[], None]
 
     _heading_tags = "h1 h2 h3 h4 h5 h6".split(" ")
-    _pre_tags = ("pre", "code")
+    _pre_tags = ("pre",)
     _table_tags = ("table", "tr", "td", "th", "thead", "tbody", "tfoot")
     _ignored = ["script", "style", "title"]
     whitespace_re = re.compile(r"\s+")
@@ -531,7 +531,7 @@ class HTMLParser(LXMLParser):
         return self.output.tell() + self.startpos + self._pending_output_offset()
 
     def _enter_pre_mode(self) -> None:
-        """Transition to preformatted mode (pre/code tags)."""
+        """Transition to preformatted mode (pre tags)."""
         # Only transition if not already in pre mode or ignoring
         if not self.is_ignoring and not self.is_in_pre_mode:
             old_state = self.state
