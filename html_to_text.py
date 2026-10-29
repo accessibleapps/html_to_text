@@ -7,7 +7,7 @@ import re
 import sys
 from typing import Callable, Dict, Optional, Union, Any, List, cast
 
-from urllib.parse import unquote, urljoin
+from urllib.parse import unquote, urljoin, urlsplit
 
 import chardet
 import lxml
@@ -792,7 +792,8 @@ class HTMLParser(LXMLParser):
         text = _collect_string_content(item)
         # Is this an internal link?
         href = item.attrib["href"]
-        if "://" not in href:
+        reference = urlsplit(href)
+        if not reference.scheme and not reference.netloc:
             href = unquote(urljoin(self.file, href))
         if self.node_parsed_callback is not None:
             end = self.output.tell() + self.startpos
