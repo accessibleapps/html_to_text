@@ -3,12 +3,11 @@ from logging import getLogger
 import argparse
 from enum import Enum
 from pathlib import Path
-import posixpath
 import re
 import sys
 from typing import Callable, Dict, Optional, Union, Any, List, cast
 
-from urllib.parse import unquote
+from urllib.parse import unquote, urljoin, urlsplit
 
 import chardet
 import lxml
@@ -605,6 +604,9 @@ class HTMLParser(LXMLParser):
             self.link_start = self._position_after_pending_output()
         if tag in ("dd", "dt"):
             self.add = "\n"
+        if self.style_callback is not None and self.element_stack:
+            element, _ = self.element_stack[-1]
+            self.element_stack[-1] = (element, self._position_after_pending_output())
         if "id" in attrs and self.node_parsed_callback:
             self.node_parsed_callback(
                 None,
@@ -684,7 +686,7 @@ class HTMLParser(LXMLParser):
                 element, start_pos = self.element_stack[-1]
                 if element == item:
                     end_pos = self.output.tell() + self.startpos
-                    style_callback_call(item, start_pos, end_pos)
+                    style_callback_call(item, min(start_pos, end_pos), end_pos)
 
         # Process semantic tags for style extraction
         if (
@@ -793,11 +795,9 @@ class HTMLParser(LXMLParser):
         text = _collect_string_content(item)
         # Is this an internal link?
         href = item.attrib["href"]
-        if "://" not in href:
-            href = unquote(item.attrib["href"])
-            href = posixpath.normpath(
-                posixpath.join(posixpath.dirname(self.file), href)
-            )
+        reference = urlsplit(href)
+        if not reference.scheme and not reference.netloc:
+            href = unquote(urljoin(self.file, href))
         if self.node_parsed_callback is not None:
             end = self.output.tell() + self.startpos
             self.node_parsed_callback(
