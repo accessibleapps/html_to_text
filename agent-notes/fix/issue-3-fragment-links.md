@@ -14,6 +14,7 @@ The original sample is minified, but lxml confirms the exact source anchor href 
 Implementation and focused tests are committed locally. Root inspects and publishes the independent PR, then follows CI. No push, PR, review, merge or release performed by this worker.
 
 # TDD evidence
+PR8 full CI found the existing tests/test_links.py fragment case asserted the old broken bare-fragment href. Updated that existing behavior assertion to require the corrected complete filename and equality with an actual emitted target ID; no check removed or weakened. Re-run only that edited test case locally, then obtain the full matrix from PR CI.
 Own isolated Python3.12 environment initialized with uv sync --frozen --all-groups. Command .venv/Scripts/python.exe -B -m pytest tests/test_fragment_links.py -q: before source edits5 failed/3 passed; after source edits8 passed. Real anchor href becomes docs/all.html#primitives and equals the emitted target ID. Focused controls cover decoded archive filenames/fragments, empty href, query-only references, base-query inheritance and existing relative/absolute archive paths. No complete CI suite, static checks or build was run locally.
 
 # PR draft
