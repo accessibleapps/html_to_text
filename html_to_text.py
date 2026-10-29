@@ -3,12 +3,11 @@ from logging import getLogger
 import argparse
 from enum import Enum
 from pathlib import Path
-import posixpath
 import re
 import sys
 from typing import Callable, Dict, Optional, Union, Any, List, cast
 
-from urllib.parse import unquote
+from urllib.parse import unquote, urljoin
 
 import chardet
 import lxml
@@ -794,10 +793,7 @@ class HTMLParser(LXMLParser):
         # Is this an internal link?
         href = item.attrib["href"]
         if "://" not in href:
-            href = unquote(item.attrib["href"])
-            href = posixpath.normpath(
-                posixpath.join(posixpath.dirname(self.file), href)
-            )
+            href = unquote(urljoin(self.file, href))
         if self.node_parsed_callback is not None:
             end = self.output.tell() + self.startpos
             self.node_parsed_callback(
