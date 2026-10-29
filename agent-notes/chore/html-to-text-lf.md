@@ -2,9 +2,8 @@
 Q asked to review, fix and merge the open PRs: #6 (issue 1 URI schemes), #7 (issue 2 style ranges), #8 (issue 3 fragment links), and #9 (issue 4 inline code) and #10 (issue 5 list boundaries), which were opened during the session. #11 is the line-ending normalization Q chose so the others integrate with small diffs.
 
 # State
-Merged: #6, #7, #11 (html_to_text.py LF only), #8 (combined with #6 on the LF file). All merges are merge commits.
-#9: master merged into fix/issue-4-inline-code; html_to_text.py resolved to master's file plus #9's three edits (`_pre_tags = ("pre",)` and two docstrings). Next: push, CI, ledger, gate, merge.
-#10: after #9, same procedure (`_block` gains "li"; it sits 4 lines from #9's `_pre_tags` edit, so it conflicts if merged at the same time).
+Merged: #6, #7, #11 (html_to_text.py LF only), #8 (combined with #6 on the LF file), #9 (re-applied on the LF file). All merges are merge commits.
+#10: master merged into fix/issue-5-list-boundaries; html_to_text.py resolved to master's file plus `_block` gaining "li". Next: push, CI, ledger, gate, merge, then cleanup.
 
 # Decisions and why
 html_to_text.py had mixed endings (631 of ~1008 lines CRLF). The Edit tool rewrites a mixed-ending file entirely to LF (one-line Edit took CR bytes 627 -> 0), so any edit through it produced whole-file churn; #8's first conflict resolution pushed ~1245 changed lines that way. Q chose (2026-10-29) a separate PR normalizing only html_to_text.py. Six test files are uniformly CRLF; the Edit tool handles uniform files, so they stay as they are.

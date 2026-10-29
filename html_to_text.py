@@ -312,7 +312,7 @@ class HTMLParser(LXMLParser):
     _table_tags = ("table", "tr", "td", "th", "thead", "tbody", "tfoot")
     _ignored = ["script", "style", "title"]
     whitespace_re = re.compile(r"\s+")
-    _block = ("p", "div", "center", "blockquote")
+    _block = ("p", "div", "center", "blockquote", "li")
     heading_levels = {"h1": 1, "h2": 2, "h3": 3, "h4": 4, "h5": 5, "h6": 6}
     # Semantic HTML tags that imply styling
     SEMANTIC_STYLES = {
